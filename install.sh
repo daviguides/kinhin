@@ -106,10 +106,10 @@ print_header() {
   printf "\n"
   box_top
   box_empty
-  printf "${CYAN}│${NC}   ${BOLD}●${NC}        ${BOLD}●${NC}                                       ${CYAN}│${NC}\n"
-  printf "${CYAN}│${NC}   ↓        ↓    │  Walking Meditation for TDD       ${CYAN}│${NC}\n"
-  printf "${CYAN}│${NC}${BOLD}K  I  N  H  I  N${NC}  │  経行 - Red, Green, Refactor      ${CYAN}│${NC}\n"
-  printf "${CYAN}│${NC}   ┴        ┴    │  (v1.0.0)                         ${CYAN}│${NC}\n"
+  printf "${CYAN}│${NC}     ${BOLD}●${NC}        ${BOLD}●${NC}                                      ${CYAN}│${NC}\n"
+  printf "${CYAN}│${NC}     ↓        ↓     │  Walking Meditation for TDD    ${CYAN}│${NC}\n"
+  printf "${CYAN}│${NC}${BOLD}  K  I  N  H  I  N${NC}  │  経行 - Red, Green, Refactor   ${CYAN}│${NC}\n"
+  printf "${CYAN}│${NC}     ┴        ┴     │  (v1.0.0)                      ${CYAN}│${NC}\n"
   box_empty
   box_separator
 }
