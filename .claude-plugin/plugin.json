@@ -1,0 +1,11 @@
+{
+    "name": "kinhin",
+    "version": "1.0.0",
+    "description": "Kinhin (経行) - Walking Meditation for TDD",
+    "author": {
+        "name": "Davi Guides",
+        "url": "https://github.com/daviguides"
+    },
+    "repository": "https://github.com/daviguides/kinhin",
+    "license": "MIT"
+}

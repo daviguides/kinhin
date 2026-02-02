@@ -59,9 +59,26 @@ When Kinhin TDD context is loaded, ALL implementations must be test-driven:
 
 ## Confirmation
 
-After reading all files, respond with:
+After reading all files, respond with EXACTLY this card:
 
 ```
-Kinhin TDD context loaded (13 files).
-Ready for test-driven development.
+╭─────────────────────────────────────────────────────╮
+│                                                     │
+│   ●        ●                                        │
+│   ↓        ↓    │  Walking Meditation for TDD       │
+│K  I  N  H  I  N  │  経行 - Red, Green, Refactor     │
+│   ┴        ┴    │  (v1.0.0)                         │
+│                                                     │
+╰─────────────────────────────────────────────────────╯
+
+┌─ TDD Cycle ─────────────────────────────────────────┐
+│ 🔴 RED    → Write failing test first                │
+│ 🟢 GREEN  → Make it pass (minimal code)             │
+│ 🔵 REFACTOR → Clean up, maintain tests              │
+└─────────────────────────────────────────────────────┘
+
+┌─ Loaded ────────────────────────────────────────────┐
+│ 2 specs + 4 guides + 6 examples + 1 checklist       │
+│ = 13 files loaded                                   │
+└─────────────────────────────────────────────────────┘
 ```
