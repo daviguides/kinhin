@@ -64,10 +64,10 @@ After reading all files, respond with EXACTLY this card:
 ```
 ╭─────────────────────────────────────────────────────╮
 │                                                     │
-│   ●        ●                                        │
-│   ↓        ↓    │  Walking Meditation for TDD       │
-│K  I  N  H  I  N  │  経行 - Red, Green, Refactor     │
-│   ┴        ┴    │  (v1.0.0)                         │
+│     ●        ●                                      │
+│     ↓        ↓    │  Walking Meditation for TDD     │
+│  K  I  N  H  I  N  │  経行 - Red, Green, Refactor   │
+│     ┴        ┴    │  (v1.0.0)                       │
 │                                                     │
 ╰─────────────────────────────────────────────────────╯
 
