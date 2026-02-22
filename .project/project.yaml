@@ -1,0 +1,5 @@
+project:
+  name: kinhin
+  type: standalone
+  docs_root: ./docs
+  owner: daviguides

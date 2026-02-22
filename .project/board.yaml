@@ -1,0 +1,25 @@
+url: https://github.com/users/daviguides/projects/5/views/1
+project_id: PVT_kwHOAA0ej84BOUuf
+project_number: 5
+owner: daviguides
+fields:
+  status: PVTSSF_lAHOAA0ej84BOUufzg9D0N0
+  priority: PVTSSF_lAHOAA0ej84BOUufzg9D0OU
+  size: PVTSSF_lAHOAA0ej84BOUufzg9D0OY
+status_options:
+  backlog: f75ad846
+  ready_for_work: 61e4505c
+  in_progress: 47fc9ee4
+  in_review: df73e18b
+  done: '98236657'
+priority_options:
+  p0: '79628723'
+  p1: 0a877460
+  p2: da944a9c
+  p3: '61222362'
+size_options:
+  xs: 6c6483d2
+  s: f784b110
+  m: 7515a9f1
+  l: 817d0097
+  xl: db339eb2
