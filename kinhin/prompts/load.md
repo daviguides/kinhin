@@ -2,21 +2,49 @@
 
 ## STOP - MANDATORY ACTION REQUIRED
 
-**DO NOT RESPOND until you have used the Read tool on EACH file below.**
+**DO NOT RESPOND until you have resolved languages (Step 0) and used
+the Read tool on ALL universal files PLUS every file for EACH
+resolved language.**
 
-This is not a reference list. This is an execution order.
+## Step 0: Resolve Languages
+
+An argument may have been passed (e.g. `/kinhin:load rust`):
+
+| Argument | Resolution |
+|----------|-----------|
+| `python` | Universal + Python |
+| `rust` | Universal + Rust |
+| `all` | Universal + all supported languages |
+| (none) | Universal + DETECT — procedure below |
+
+### DETECT Procedure
+
+1. Search for markers in the current directory, its ancestors, AND
+   shallow subdirectories (max depth 3). Use Glob or:
+   ```bash
+   find . -maxdepth 3 \( -name pyproject.toml -o -name Cargo.toml \) \
+     -not -path "*/node_modules/*" -not -path "*/.venv/*" \
+     -not -path "*/target/*" -not -path "*/.git/*" 2>/dev/null
+   ```
+2. Map markers to languages:
+
+   | Marker | Language |
+   |--------|----------|
+   | `pyproject.toml` | python |
+   | `Cargo.toml` | rust |
+
+3. Load the **UNION** of all detected languages (monorepos load
+   multiple languages).
+4. **Nothing detected → fallback: python.**
+
+## Universal Files (6) — ALWAYS
 
 ### Step 1: Read TDD Methodology
 ```
 Read: ~/.claude/kinhin/spec/tdd/tdd-spec.md
 ```
 
-### Step 2: Read Python TDD Specifics
-```
-Read: ~/.claude/kinhin/spec/python-tdd/python-tdd-spec.md
-```
-
-### Step 3: Read TDD Implementation Guides
+### Step 2: Read TDD Implementation Guides
 ```
 Read: ~/.claude/kinhin/context/guides/tdd-implementation-guide.md
 Read: ~/.claude/kinhin/context/guides/tdd-feature-development.md
@@ -24,42 +52,70 @@ Read: ~/.claude/kinhin/context/guides/tdd-bugfix-guide.md
 Read: ~/.claude/kinhin/context/guides/tdd-refactoring-guide.md
 ```
 
-### Step 4: Read Test Templates
+### Step 3: Read Checklist
+```
+Read: ~/.claude/kinhin/context/checklists/tdd-checklist.md
+```
+
+## Python Files (7)
+
+### Step 4a: Read Python TDD Spec
+```
+Read: ~/.claude/kinhin/spec/python-tdd/python-tdd-spec.md
+```
+
+### Step 5a: Read Python Test Templates
 ```
 Read: ~/.claude/kinhin/context/examples/tdd-unit-tests.md
 Read: ~/.claude/kinhin/context/examples/tdd-integration-tests.md
 Read: ~/.claude/kinhin/context/examples/tdd-property-tests.md
 Read: ~/.claude/kinhin/context/examples/tdd-error-handling-tests.md
 Read: ~/.claude/kinhin/context/examples/tdd-performance-tests.md
+Read: ~/.claude/kinhin/context/examples/tdd-anti-patterns.md
 ```
 
-### Step 5: Read Anti-Patterns and Checklist
+## Rust Files (2)
+
+### Step 4b: Read Rust TDD Spec
 ```
-Read: ~/.claude/kinhin/context/examples/tdd-anti-patterns.md
-Read: ~/.claude/kinhin/context/checklists/tdd-checklist.md
+Read: ~/.claude/kinhin/spec/rust-tdd/rust-tdd-spec.md
+```
+
+### Step 5b: Read Rust TDD Patterns
+```
+Read: ~/.claude/kinhin/context/examples/rust-tdd-patterns.md
 ```
 
 ---
 
 ## HALT CONDITIONS
 
-**If you responded without reading all 13 files above: YOU VIOLATED THIS PRINCIPLE.**
+**If you responded without reading the 6 universal files plus all
+files for every resolved language: YOU VIOLATED THIS PRINCIPLE.**
 
 ---
 
 ## After Loading
 
-When Kinhin TDD context is loaded, ALL implementations must be test-driven:
+When Kinhin TDD context is loaded, ALL implementations must be
+test-driven:
 
 1. **Test First** - Write tests before implementation
 2. **Red-Green-Refactor** - Follow the TDD cycle
 3. **Batch Processing** - Generate tests in batches
-4. **Property-Based** - Use Hypothesis for invariants
+4. **Property-Based** - Invariants via hypothesis (Python) / proptest (Rust)
 5. **Anti-Hallucination** - Tests prevent LLM hallucinations
+
+**Rust sessions additionally**: RED includes compile errors;
+type-eliminated scenarios replace defensive tests; trait seams
+before mocks.
 
 ## Confirmation
 
-After reading all files, respond with EXACTLY this card:
+After reading all files, respond with the card below, filling the
+Loaded box with the actual composition (e.g.
+`universal (6) + python (7) = 13 files` or
+`universal (6) + python (7) + rust (2) = 15 files`):
 
 ```
 ╭─────────────────────────────────────────────────────╮
@@ -67,7 +123,7 @@ After reading all files, respond with EXACTLY this card:
 │     ●        ●                                      │
 │     ↓        ↓    │  Walking Meditation for TDD     │
 │  K  I  N  H  I  N  │  経行 - Red, Green, Refactor   │
-│     ┴        ┴    │  (v1.0.0)                       │
+│     ┴        ┴    │  (v1.1.0)                       │
 │                                                     │
 ╰─────────────────────────────────────────────────────╯
 
@@ -78,7 +134,7 @@ After reading all files, respond with EXACTLY this card:
 └─────────────────────────────────────────────────────┘
 
 ┌─ Loaded ────────────────────────────────────────────┐
-│ 2 specs + 4 guides + 6 examples + 1 checklist       │
-│ = 13 files loaded                                   │
+│ universal (6) + {languages with counts}             │
+│ = {total} files loaded                              │
 └─────────────────────────────────────────────────────┘
 ```

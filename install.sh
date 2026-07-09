@@ -109,7 +109,7 @@ print_header() {
   printf "${CYAN}│${NC}     ${BOLD}●${NC}        ${BOLD}●${NC}                                      ${CYAN}│${NC}\n"
   printf "${CYAN}│${NC}     ↓        ↓     │  Walking Meditation for TDD    ${CYAN}│${NC}\n"
   printf "${CYAN}│${NC}${BOLD}  K  I  N  H  I  N${NC}  │  経行 - Red, Green, Refactor   ${CYAN}│${NC}\n"
-  printf "${CYAN}│${NC}     ┴        ┴     │  (v1.0.0)                      ${CYAN}│${NC}\n"
+  printf "${CYAN}│${NC}     ┴        ┴     │  (v1.1.0)                      ${CYAN}│${NC}\n"
   box_empty
   box_separator
 }
@@ -202,7 +202,7 @@ print_next_steps() {
   box_separator
   box_empty
   box_heading
-  box_text "/kinhin:load          → TDD principles"
+  box_text "/kinhin:load [lang]   → TDD principles"
   box_empty
   box_text "Docs: https://github.com/daviguides/kinhin"
   box_empty

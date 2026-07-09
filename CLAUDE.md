@@ -13,16 +13,16 @@
 kinhin/
 ├── kinhin/                   # Bundle (Gradient pattern)
 │   ├── spec/
-│   │   ├── tdd/              # TDD methodology
-│   │   └── python-tdd/       # Python-specific TDD
+│   │   ├── tdd/              # TDD methodology (universal)
+│   │   ├── python-tdd/       # Python-specific TDD
+│   │   └── rust-tdd/         # Rust-specific TDD (methodological deltas)
 │   ├── context/
-│   │   ├── guides/           # TDD workflow guides
-│   │   ├── examples/         # Test templates
-│   │   └── checklists/       # TDD checklists
+│   │   ├── guides/           # TDD workflow guides (universal)
+│   │   ├── examples/         # Test templates (Python) + rust-tdd-patterns.md
+│   │   └── checklists/       # TDD checklists (universal)
 │   └── prompts/
 ├── commands/
-├── skills/
-└── docs/
+└── skills/
 ```
 
 
@@ -30,13 +30,27 @@ kinhin/
 
 | Command | Purpose |
 |---------|---------|
-| `/kinhin:load` | Load TDD principles |
-| `/kinhin:load-python` | Load Python-specific TDD |
+| `/kinhin:load [python\|rust\|all]` | Load TDD principles — universal core + language specifics |
+
+**Language resolution**: explicit argument wins; without argument,
+detect markers (`pyproject.toml` → python, `Cargo.toml` → rust) in
+cwd, ancestors, and shallow subdirectories, loading the UNION
+(monorepos load multiple). Nothing detected → python fallback.
+Universal files (methodology, guides, checklist) load ALWAYS.
+
+**Rust TDD** is not translated Python TDD — the spec covers the
+methodological deltas: the compiler eliminates a class of tests
+(type-eliminated scenarios), RED includes compile errors, unit tests
+live inline, error tests assert enum variants, and mocking requires
+trait seams decided in the RED phase. Tooling (nextest, rstest,
+proptest, mockall) is NOT re-specified — it lives in shodo's
+`rust-testing-tools-spec.md`.
 
 
 ## Related Plugins
 
-- **Zazen**: Code quality (naming, structure, zen, python)
+- **Zazen**: Code quality (naming, structure, zen)
+- **Shodo**: Language standards (Python & Rust) — owns testing TOOLS specs
 - **Arche**: Behavioral principles for Claude Code
 - **Gradient**: Plugin architecture
 
