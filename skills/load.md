@@ -1,5 +1,5 @@
 ---
-description: Load TDD principles (python|rust|all; detects project languages if omitted)
+description: Load TDD principles (python|rust|java|all; detects project languages if omitted)
 user-invocable: true
 ---
 

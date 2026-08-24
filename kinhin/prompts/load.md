@@ -14,6 +14,7 @@ An argument may have been passed (e.g. `/kinhin:load rust`):
 |----------|-----------|
 | `python` | Universal + Python |
 | `rust` | Universal + Rust |
+| `java` | Universal + Java |
 | `all` | Universal + all supported languages |
 | (none) | Universal + DETECT — procedure below |
 
@@ -22,7 +23,8 @@ An argument may have been passed (e.g. `/kinhin:load rust`):
 1. Search for markers in the current directory, its ancestors, AND
    shallow subdirectories (max depth 3). Use Glob or:
    ```bash
-   find . -maxdepth 3 \( -name pyproject.toml -o -name Cargo.toml \) \
+   find . -maxdepth 3 \( -name pyproject.toml -o -name Cargo.toml \
+     -o -name pom.xml -o -name build.gradle -o -name build.gradle.kts \) \
      -not -path "*/node_modules/*" -not -path "*/.venv/*" \
      -not -path "*/target/*" -not -path "*/.git/*" 2>/dev/null
    ```
@@ -32,6 +34,7 @@ An argument may have been passed (e.g. `/kinhin:load rust`):
    |--------|----------|
    | `pyproject.toml` | python |
    | `Cargo.toml` | rust |
+   | `pom.xml` / `build.gradle` / `build.gradle.kts` | java |
 
 3. Load the **UNION** of all detected languages (monorepos load
    multiple languages).
@@ -86,6 +89,18 @@ Read: ~/.claude/kinhin/spec/rust-tdd/rust-tdd-spec.md
 Read: ~/.claude/kinhin/context/examples/rust-tdd-patterns.md
 ```
 
+## Java Files (2)
+
+### Step 4c: Read Java TDD Spec
+```
+Read: ~/.claude/kinhin/spec/java-tdd/java-tdd-spec.md
+```
+
+### Step 5c: Read Java TDD Patterns
+```
+Read: ~/.claude/kinhin/context/examples/java-tdd-patterns.md
+```
+
 ---
 
 ## HALT CONDITIONS
@@ -110,12 +125,17 @@ test-driven:
 type-eliminated scenarios replace defensive tests; trait seams
 before mocks.
 
+**Java sessions additionally**: RED includes compile errors;
+NullAway/enum/record scenarios are type-eliminated; value
+constraints tested once at constructor boundaries; interface seams
+before mocks; ArchUnit rules as tests.
+
 ## Confirmation
 
 After reading all files, respond with the card below, filling the
 Loaded box with the actual composition (e.g.
 `universal (6) + python (7) = 13 files` or
-`universal (6) + python (7) + rust (2) = 15 files`):
+`universal (6) + python (7) + rust (2) + java (2) = 17 files`):
 
 ```
 ╭─────────────────────────────────────────────────────╮
@@ -123,7 +143,7 @@ Loaded box with the actual composition (e.g.
 │     ●        ●                                      │
 │     ↓        ↓    │  Walking Meditation for TDD     │
 │  K  I  N  H  I  N  │  経行 - Red, Green, Refactor   │
-│     ┴        ┴    │  (v1.1.0)                       │
+│     ┴        ┴    │  (v1.2.0)                       │
 │                                                     │
 ╰─────────────────────────────────────────────────────╯
 

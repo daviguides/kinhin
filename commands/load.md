@@ -1,6 +1,6 @@
 ---
-description: Load TDD principles (python|rust|all; detects project languages if omitted)
-argument-hint: "[python|rust|all]"
+description: Load TDD principles (python|rust|java|all; detects project languages if omitted)
+argument-hint: "[python|rust|java|all]"
 ---
 
 # MANDATORY ACTION
