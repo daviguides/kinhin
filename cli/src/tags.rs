@@ -41,6 +41,8 @@ impl std::fmt::Display for LifecycleTag {
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct TaggedTest {
     pub file: PathBuf,
+    /// Display name. For Python this is the qualified `Class::test` form,
+    /// which is unique within the file.
     pub name: Option<String>,
     pub tag: LifecycleTag,
     pub ref_value: Option<String>,
@@ -59,6 +61,8 @@ const SKIP_DIRS: &[&str] = &[
     "mutants",
     ".mutmut-cache",
     ".stryker-tmp",
+    ".tox",
+    "site-packages",
 ];
 
 fn should_skip(entry: &walkdir::DirEntry) -> bool {
@@ -73,6 +77,7 @@ pub fn scan_test_files(root: &str, languages: &[Language]) -> Vec<TaggedTest> {
     let mut results = Vec::new();
 
     for entry in WalkDir::new(root)
+        .sort_by_file_name()
         .into_iter()
         .filter_entry(|e| !should_skip(e))
         .flatten()
@@ -100,7 +105,7 @@ pub fn scan_test_files(root: &str, languages: &[Language]) -> Vec<TaggedTest> {
     results
 }
 
-fn is_test_file(name: &str, _path: &Path, lang: Language) -> bool {
+pub fn is_test_file(name: &str, _path: &Path, lang: Language) -> bool {
     match lang {
         Language::Python => {
             name.starts_with("test_") && name.ends_with(".py")
@@ -127,49 +132,26 @@ fn parse_tags(path: &Path, content: &str, lang: Language) -> Vec<TaggedTest> {
 }
 
 fn parse_python_tags(path: &Path, content: &str) -> Vec<TaggedTest> {
-    let mut results = Vec::new();
-    let re_func = Regex::new(r"(?m)^\s*def (test_\w+)").unwrap();
-    let re_scaffold = Regex::new(r"@pytest\.mark\.scaffold").unwrap();
-    let re_characterization = Regex::new(r"@pytest\.mark\.characterization").unwrap();
-    let re_decision = Regex::new(r#"@pytest\.mark\.decision\((?:reason=)?"([^"]+)""#).unwrap();
-    let re_contract = Regex::new(r#"@pytest\.mark\.contract\((?:party=)?"([^"]+)""#).unwrap();
-    let re_incident = Regex::new(r#"@pytest\.mark\.incident\((?:ref=)?"([^"]+)""#).unwrap();
+    crate::pytests::parse(content)
+        .into_iter()
+        .map(|test| TaggedTest {
+            file: path.to_path_buf(),
+            name: Some(test.qualified),
+            tag: test.tag,
+            ref_value: test.ref_value,
+        })
+        .collect()
+}
 
-    let lines: Vec<&str> = content.lines().collect();
-
-    for (i, line) in lines.iter().enumerate() {
-        if let Some(cap) = re_func.captures(line) {
-            let func_name = cap[1].to_string();
-            let context = if i >= 5 {
-                lines[i - 5..i].join("\n")
-            } else {
-                lines[..i].join("\n")
-            };
-
-            let (tag, ref_value) = if re_scaffold.is_match(&context) {
-                (LifecycleTag::Scaffold, None)
-            } else if re_characterization.is_match(&context) {
-                (LifecycleTag::Characterization, None)
-            } else if let Some(cap) = re_decision.captures(&context) {
-                (LifecycleTag::Decision, Some(cap[1].to_string()))
-            } else if let Some(cap) = re_contract.captures(&context) {
-                (LifecycleTag::Contract, Some(cap[1].to_string()))
-            } else if let Some(cap) = re_incident.captures(&context) {
-                (LifecycleTag::Incident, Some(cap[1].to_string()))
-            } else {
-                (LifecycleTag::Untagged, None)
-            };
-
-            results.push(TaggedTest {
-                file: path.to_path_buf(),
-                name: Some(func_name),
-                tag,
-                ref_value,
-            });
-        }
+/// The contiguous run of lines directly above `index` that satisfy `belongs`
+/// (annotations, attributes, comments). A blank line or code ends the run,
+/// so a tag never leaks from one test to the next.
+fn block_above(lines: &[&str], index: usize, belongs: impl Fn(&str) -> bool) -> String {
+    let mut start = index;
+    while start > 0 && belongs(lines[start - 1].trim()) {
+        start -= 1;
     }
-
-    results
+    lines[start..index].join("\n")
 }
 
 fn parse_rust_tags(path: &Path, content: &str) -> Vec<TaggedTest> {
@@ -179,7 +161,6 @@ fn parse_rust_tags(path: &Path, content: &str) -> Vec<TaggedTest> {
         return results;
     }
 
-    let _in_scaffold = Regex::new(r"(?m)mod scaffold\s*\{").unwrap();
     let re_test = Regex::new(r"(?m)^\s*(?:#\[test\]|#\[rstest\])").unwrap();
     let re_fn = Regex::new(r"(?m)^\s*fn (\w+)").unwrap();
     let re_kinhin = Regex::new(r#"// kinhin: (\w+)\(ref=["']([^"']+)["']\)"#).unwrap();
@@ -204,11 +185,7 @@ fn parse_rust_tags(path: &Path, content: &str) -> Vec<TaggedTest> {
             .iter()
             .any(|(start, end)| byte_offset >= *start && byte_offset < *end);
 
-        let context = if i >= 3 {
-            lines[i - 3..i].join("\n")
-        } else {
-            lines[..i].join("\n")
-        };
+        let context = block_above(&lines, i, |l| l.starts_with("//") || l.starts_with("#["));
 
         let (tag, ref_value) = if in_scaffold_mod {
             (LifecycleTag::Scaffold, None)
@@ -286,8 +263,11 @@ fn parse_java_tags(path: &Path, content: &str) -> Vec<TaggedTest> {
         };
         let method_name = method_cap[1].to_string();
 
-        let context_start = i.saturating_sub(5);
-        let context = lines[context_start..=i].join("\n");
+        // Annotations may sit above or below `@Test`: take the whole run that ends at the method.
+        let method_line = (i..search_end)
+            .find(|k| re_method.is_match(lines[*k]))
+            .unwrap_or(i);
+        let context = block_above(&lines, method_line, |l| l.starts_with('@') || l.starts_with("//"));
 
         let (tag, ref_value) = if let Some(tag_cap) = re_tag.captures(&context) {
             let kind = &tag_cap[1];
@@ -347,11 +327,7 @@ fn parse_typescript_tags(path: &Path, content: &str) -> Vec<TaggedTest> {
                 continue;
             }
 
-            let context = if i >= 3 {
-                lines[i - 3..i].join("\n")
-            } else {
-                lines[..i].join("\n")
-            };
+            let context = block_above(&lines, i, |l| l.starts_with("//"));
 
             let (tag, ref_value) = if let Some(kcap) = re_kinhin.captures(&context) {
                 let kind = &kcap[1];
@@ -377,4 +353,140 @@ fn parse_typescript_tags(path: &Path, content: &str) -> Vec<TaggedTest> {
     }
 
     results
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tags_of(tests: &[TaggedTest]) -> Vec<(String, LifecycleTag, Option<String>)> {
+        tests
+            .iter()
+            .map(|t| (t.name.clone().unwrap_or_default(), t.tag.clone(), t.ref_value.clone()))
+            .collect()
+    }
+
+    #[test]
+    fn python_reads_every_lifecycle_marker_with_its_text() {
+        let src = r#"
+import pytest
+
+@pytest.mark.scaffold
+def test_a(): pass
+
+@pytest.mark.decision(reason="discount never negative")
+def test_b(): pass
+
+@pytest.mark.contract(party="iOS v2")
+def test_c(): pass
+
+@pytest.mark.incident(ref="ISSUE-186")
+def test_d(): pass
+
+@pytest.mark.characterization
+def test_e(): pass
+
+@pytest.mark.slow
+def test_f(): pass
+"#;
+        assert_eq!(
+            tags_of(&parse_python_tags(Path::new("test_x.py"), src)),
+            [
+                ("test_a".into(), LifecycleTag::Scaffold, None),
+                ("test_b".into(), LifecycleTag::Decision, Some("discount never negative".into())),
+                ("test_c".into(), LifecycleTag::Contract, Some("iOS v2".into())),
+                ("test_d".into(), LifecycleTag::Incident, Some("ISSUE-186".into())),
+                ("test_e".into(), LifecycleTag::Characterization, None),
+                ("test_f".into(), LifecycleTag::Untagged, None),
+            ]
+        );
+    }
+
+    #[test]
+    fn rust_scaffold_module_and_kinhin_comments() {
+        let src = r#"
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // kinhin: decision(ref="docs/fees.md#grace")
+    #[test]
+    fn grace_uses_higher_set() {}
+
+    #[test]
+    fn plain() {}
+
+    mod scaffold {
+        use super::*;
+
+        #[test]
+        fn parser_returns_keys() {}
+    }
+}
+"#;
+        assert_eq!(
+            tags_of(&parse_rust_tags(Path::new("lib.rs"), src)),
+            [
+                ("grace_uses_higher_set".into(), LifecycleTag::Decision, Some("docs/fees.md#grace".into())),
+                ("plain".into(), LifecycleTag::Untagged, None),
+                ("parser_returns_keys".into(), LifecycleTag::Scaffold, None),
+            ]
+        );
+    }
+
+    #[test]
+    fn java_tag_annotations_with_display_name_as_ref() {
+        let src = r#"
+class FooTest {
+    @Tag("scaffold")
+    @Test
+    void parserReturnsKeys() {}
+
+    @Tag("incident")
+    @DisplayName("TICKET-186: scan walked the keyspace")
+    @Test
+    void neverScans() {}
+
+    @Test
+    void untagged() {}
+}
+"#;
+        assert_eq!(
+            tags_of(&parse_java_tags(Path::new("FooTest.java"), src)),
+            [
+                ("parserReturnsKeys".into(), LifecycleTag::Scaffold, None),
+                (
+                    "neverScans".into(),
+                    LifecycleTag::Incident,
+                    Some("TICKET-186: scan walked the keyspace".into())
+                ),
+                ("untagged".into(), LifecycleTag::Untagged, None),
+            ]
+        );
+    }
+
+    #[test]
+    fn typescript_scaffold_by_file_suffix_and_comment_tags() {
+        let src = "// @contract(ref=\"API v2\")\nit('keeps the wire shape', () => {});\n\ntest('plain', () => {});\n";
+        assert_eq!(
+            tags_of(&parse_typescript_tags(Path::new("a.test.ts"), src)),
+            [
+                ("keeps the wire shape".into(), LifecycleTag::Contract, Some("API v2".into())),
+                ("plain".into(), LifecycleTag::Untagged, None),
+            ]
+        );
+        let scaffold = parse_typescript_tags(Path::new("a.scaffold.test.ts"), src);
+        assert!(scaffold.iter().all(|t| t.tag == LifecycleTag::Scaffold));
+    }
+
+    #[test]
+    fn test_file_detection_per_language() {
+        let p = Path::new("x");
+        assert!(is_test_file("test_a.py", p, Language::Python));
+        assert!(is_test_file("a_test.py", p, Language::Python));
+        assert!(!is_test_file("conftest.py", p, Language::Python));
+        assert!(is_test_file("a.spec.tsx", p, Language::TypeScript));
+        assert!(!is_test_file("a.ts", p, Language::TypeScript));
+        assert!(is_test_file("FooTest.java", p, Language::Java));
+    }
 }

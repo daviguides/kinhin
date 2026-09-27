@@ -1,19 +1,19 @@
 use clap::{Parser, Subcommand, ValueEnum};
-use tracing_subscriber::EnvFilter;
 
 mod agent;
 mod audit;
-#[allow(dead_code)]
 mod census;
 mod detect;
-#[allow(dead_code)]
 mod display;
+mod env;
 mod gate;
 mod prune;
+mod pycheck;
+mod pyproject;
+mod pytests;
 mod run;
 mod setup;
 mod tag;
-#[allow(dead_code)]
 mod tags;
 
 #[derive(Copy, Clone, PartialEq, Eq, ValueEnum)]
@@ -34,195 +34,176 @@ pub enum OutputFormat {
 struct Cli {
     #[command(subcommand)]
     command: Commands,
-
-    #[arg(long, value_enum, default_value_t = OutputFormat::Rich, global = true)]
-    output: OutputFormat,
-
-    #[arg(short, long, action = clap::ArgAction::Count, global = true)]
-    verbose: u8,
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Scan test files, report tags, validate refs
+    /// List every test with its lifecycle tag and check that permanent tags name an authority
     Audit {
-        /// Directory to scan (defaults to current directory)
+        /// Project directory
         #[arg(default_value = ".")]
         path: String,
+
+        #[arg(long, value_enum, default_value_t = OutputFormat::Rich)]
+        output: OutputFormat,
     },
 
     /// Count tests by lifecycle tag
     Census {
-        /// Directory to scan (defaults to current directory)
+        /// Project directory
         #[arg(default_value = ".")]
         path: String,
+
+        #[arg(long, value_enum, default_value_t = OutputFormat::Rich)]
+        output: OutputFormat,
     },
 
-    /// Wrap the test runner with Runner Contract config
-    Run {
-        /// Run mode: loop (changed-set), full (gate), diagnostic (isolate flake)
-        #[arg(long, value_enum, default_value_t = run::RunMode::Loop)]
-        mode: run::RunMode,
-
-        /// Language override (auto-detects if omitted)
-        #[arg(long, value_enum)]
-        lang: Option<detect::Language>,
-
-        /// TypeScript runner override: jest or vitest (auto-detects if omitted)
-        #[arg(long, value_enum)]
-        ts_runner: Option<run::TsRunner>,
-
-        /// Directory to run in (defaults to current directory)
-        #[arg(long, default_value = ".")]
-        path: String,
-
-        /// Extra arguments passed through to the underlying test runner
-        #[arg(last = true)]
-        extra: Vec<String>,
-    },
-
-    /// Run mutation parity gate (K₁ ⊇ K₀)
-    Gate {
-        /// Language override (auto-detects if omitted)
-        #[arg(long, value_enum)]
-        lang: Option<detect::Language>,
-
-        /// Path to baseline file (K₀) for comparison
-        #[arg(long)]
-        baseline: Option<String>,
-
-        /// Save current results as baseline (K₀) to this path
-        #[arg(long)]
-        save_baseline: Option<String>,
-
-        /// Directory to run in (defaults to current directory)
-        #[arg(long, default_value = ".")]
-        path: String,
-    },
-
-    /// Auto-tag tests via AI agent session
-    Tag {
-        /// Language override (auto-detects if omitted)
-        #[arg(long, value_enum)]
-        lang: Option<detect::Language>,
-
-        /// Preview only — run session, save suggestions, don't apply
-        #[arg(long)]
-        dry_run: bool,
-
-        /// Ignore cached suggestions, run a new session
-        #[arg(long)]
-        force: bool,
-
-        /// Model to use for tagging (default: haiku for cost efficiency)
-        #[arg(long, default_value = "haiku")]
-        model: String,
-
-        /// Directory to scan (defaults to current directory)
-        #[arg(long, default_value = ".")]
-        path: String,
-    },
-
-    /// Check and install runner dependencies
+    /// Check what the other commands need; with --install, set it up (uv-managed Python projects)
     Setup {
-        /// Directory to check (defaults to current directory)
+        /// Project directory
         #[arg(default_value = ".")]
         path: String,
 
-        /// Install missing dependencies (default: check only)
+        /// Add missing dev dependencies with `uv add --dev` and write the pytest/mutmut config
         #[arg(long)]
         install: bool,
     },
 
-    /// Prune construction tests: census → classify → collapse → verify
-    Prune {
-        /// Language override (auto-detects if omitted)
+    /// Run the test suite under the Runner Contract (no bail, parallel, randomized)
+    Run {
+        /// loop: tests affected by changes. full: whole suite minus scaffolds. diagnostic: serial, stop at first failure
+        #[arg(long, value_enum, default_value_t = run::RunMode::Loop)]
+        mode: run::RunMode,
+
+        /// Language override (auto-detected if omitted)
         #[arg(long, value_enum)]
         lang: Option<detect::Language>,
 
-        /// Apply deletions (default: dry run showing the plan)
+        /// TypeScript runner override (auto-detected if omitted)
+        #[arg(long, value_enum)]
+        ts_runner: Option<run::TsRunner>,
+
+        /// Project directory
+        #[arg(long, default_value = ".")]
+        path: String,
+
+        /// Extra arguments passed through to the test runner (after `--`)
+        #[arg(last = true)]
+        extra: Vec<String>,
+    },
+
+    /// Mutation parity gate (K₁ ⊇ K₀) on mutmut: Python projects
+    Gate {
+        /// Compare this run against a saved baseline; exit 1 if a baseline-killed mutant is no longer killed
+        #[arg(long)]
+        baseline: Option<String>,
+
+        /// Save this run as the baseline (K₀)
+        #[arg(long)]
+        save_baseline: Option<String>,
+
+        /// Restrict the run to mutant-name globs, e.g. 'pkg.services.billing*' (repeatable)
+        #[arg(long)]
+        scope: Vec<String>,
+
+        /// Project directory
+        #[arg(long, default_value = ".")]
+        path: String,
+
+        #[arg(long, value_enum, default_value_t = OutputFormat::Rich)]
+        output: OutputFormat,
+    },
+
+    /// Classify untagged tests in one agent session and write the lifecycle markers
+    Tag {
+        /// Run the session and save the suggestions without touching any file
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Ignore suggestions cached by a previous --dry-run and run a new session
+        #[arg(long)]
+        force: bool,
+
+        /// Claude model for the session
+        #[arg(long, default_value = "haiku")]
+        model: String,
+
+        /// Project directory
+        #[arg(long, default_value = ".")]
+        path: String,
+
+        #[arg(long, value_enum, default_value_t = OutputFormat::Rich)]
+        output: OutputFormat,
+    },
+
+    /// Delete scaffold tests; with --verify, keep the ones mutation parity proves load-bearing
+    Prune {
+        /// Delete the tests (default: show the plan only)
         #[arg(long)]
         apply: bool,
 
-        /// Run mutation parity gate after pruning
-        #[arg(long)]
+        /// Prove K₁ ⊇ K₀ with mutmut; scaffolds whose removal lets mutants escape are kept
+        #[arg(long, requires = "apply")]
         verify: bool,
 
-        /// Directory to scan (defaults to current directory)
+        /// Project directory
         #[arg(long, default_value = ".")]
         path: String,
+
+        #[arg(long, value_enum, default_value_t = OutputFormat::Rich)]
+        output: OutputFormat,
     },
 }
 
 fn main() {
     let cli = Cli::parse();
 
-    let filter = match cli.verbose {
-        0 => "warn",
-        1 => "info",
-        2 => "debug",
-        _ => "trace",
-    };
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::new(filter))
-        .without_time()
-        .init();
-
-    match cli.command {
-        Commands::Audit { ref path } => audit::run(path, cli.output),
-        Commands::Census { ref path } => {
-            let languages = detect::detect_languages(path);
-            let tests = tags::scan_test_files(path, &languages);
-            let census = census::Census::from_tests(&tests);
-            census.display(cli.output);
+    let code = match cli.command {
+        Commands::Audit { path, output } => audit::run(&path, output),
+        Commands::Census { path, output } => {
+            let languages = detect::detect_languages(&path);
+            let root = env::canonical_root(&path);
+            let tests = tags::scan_test_files(&root.display().to_string(), &languages);
+            census::Census::from_tests(&tests).display(output);
+            0
         }
-        Commands::Setup { ref path, install } => {
-            if install {
-                setup::install(path);
-            } else {
-                let ok = setup::check(path);
-                if !ok {
-                    println!();
-                    display::print_warning("Run `kinhin setup --install` to install missing deps.");
-                    std::process::exit(1);
-                }
-            }
-        }
+        Commands::Setup { path, install } => setup::run(&path, install),
         Commands::Run {
             mode,
             lang,
             ts_runner,
-            ref path,
-            ref extra,
+            path,
+            extra,
         } => {
-            run::run(mode, lang, ts_runner, path, extra);
+            run::run(mode, lang, ts_runner, &path, &extra);
+            0
         }
         Commands::Gate {
-            lang,
-            ref baseline,
-            ref save_baseline,
-            ref path,
+            baseline,
+            save_baseline,
+            scope,
+            path,
+            output,
         } => {
-            gate::run(path, lang, baseline.as_deref(), save_baseline.as_deref(), cli.output);
+            gate::run(&path, baseline.as_deref(), save_baseline.as_deref(), &scope, output);
+            0
         }
         Commands::Tag {
-            lang,
             dry_run,
             force,
-            ref model,
-            ref path,
+            model,
+            path,
+            output,
         } => {
-            let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
-            rt.block_on(tag::run(path, lang, !dry_run, force, Some(model), cli.output));
+            let runtime = tokio::runtime::Runtime::new().expect("tokio runtime");
+            runtime.block_on(tag::run(&path, dry_run, force, &model, output))
         }
         Commands::Prune {
-            lang,
             apply,
             verify,
-            ref path,
-        } => {
-            let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
-            rt.block_on(prune::run(path, lang, apply, verify, cli.output));
-        }
-    }
+            path,
+            output,
+        } => prune::run(&path, apply, verify, output),
+    };
+    std::process::exit(code);
 }

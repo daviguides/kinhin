@@ -17,8 +17,10 @@ pub struct Census {
 
 impl Census {
     pub fn from_tests(tests: &[TaggedTest]) -> Self {
-        let mut c = Census::default();
-        c.total = tests.len();
+        let mut c = Census {
+            total: tests.len(),
+            ..Census::default()
+        };
         for t in tests {
             match &t.tag {
                 LifecycleTag::Scaffold => c.scaffold += 1,
@@ -30,10 +32,6 @@ impl Census {
             }
         }
         c
-    }
-
-    pub fn permanent_count(&self) -> usize {
-        self.decision + self.contract + self.incident
     }
 
     pub fn temporary_count(&self) -> usize {
@@ -105,7 +103,7 @@ impl Census {
 
         if self.untagged > 0 {
             display::print_warning(&format!(
-                "{} untagged test(s) — classify before prune",
+                "{} untagged test(s): run `kinhin tag` before pruning",
                 self.untagged
             ));
         }

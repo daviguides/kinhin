@@ -1,404 +1,444 @@
+//! `kinhin tag`: classify untagged tests in one agent session and write
+//! the lifecycle markers into the test files.
+
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
 use comfy_table::{Cell, CellAlignment, Color};
 use owo_colors::OwoColorize;
+use serde::{Deserialize, Serialize};
 
 use crate::agent::{self, TagSuggestion};
+use crate::census::Census;
 use crate::detect::{self, Language};
 use crate::display;
-use crate::tags::{self, LifecycleTag, TaggedTest};
+use crate::env::{self, PyEnv};
+use crate::pycheck;
+use crate::pyproject;
+use crate::pytests::{self, Marker};
+use crate::tags::{self, LifecycleTag};
 use crate::OutputFormat;
 
-#[derive(serde::Serialize)]
-struct TagReport {
-    files_scanned: usize,
-    untagged_found: usize,
-    suggestions: Vec<FileSuggestions>,
-}
+const CACHE_SCHEMA: u32 = 2;
+const CACHE_FILE: &str = "tag-suggestions.json";
 
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct FileSuggestions {
+    /// Path relative to the project root.
     file: String,
     suggestions: Vec<TagSuggestion>,
 }
 
-const SUGGESTIONS_PATH: &str = ".kinhin/tag-suggestions.json";
+#[derive(Debug, Serialize, Deserialize)]
+struct Cache {
+    schema_version: u32,
+    model: String,
+    files: Vec<FileSuggestions>,
+}
 
-pub async fn run(
-    path: &str,
-    lang: Option<Language>,
-    apply: bool,
-    force: bool,
-    model: Option<&str>,
-    format: OutputFormat,
-) {
-    let languages = lang
-        .map(|l| vec![l])
-        .unwrap_or_else(|| detect::detect_languages(path));
+#[derive(Debug, Serialize)]
+struct TagReport {
+    untagged_found: usize,
+    files: Vec<FileSuggestions>,
+    applied: bool,
+    markers_written: usize,
+}
 
-    if languages.is_empty() {
-        display::print_error("no language detected — use --lang to specify");
-        std::process::exit(1);
+fn relative(path: &Path, root: &Path) -> String {
+    let absolute = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    absolute.strip_prefix(root).unwrap_or(&absolute).display().to_string()
+}
+
+fn load_cache(path: &Path) -> Option<Cache> {
+    let cache: Cache = serde_json::from_str(&std::fs::read_to_string(path).ok()?).ok()?;
+    (cache.schema_version == CACHE_SCHEMA).then_some(cache)
+}
+
+/// The marker to write for one suggestion.
+fn marker_for(suggestion: &TagSuggestion) -> Marker {
+    let reason = Some(suggestion.reason.trim()).filter(|r| !r.is_empty());
+    let reference = suggestion.ref_value.as_deref().map(str::trim).filter(|r| !r.is_empty() && *r != "null");
+    match suggestion.tag.as_str() {
+        "decision" => Marker {
+            tag: LifecycleTag::Decision,
+            text: reason.or(reference).map(String::from),
+        },
+        "contract" => Marker {
+            tag: LifecycleTag::Contract,
+            text: reference.or(reason).map(String::from),
+        },
+        // An incident without a ticket has no authority to point at: keep it as a decision.
+        "incident" => match reference {
+            Some(r) => Marker {
+                tag: LifecycleTag::Incident,
+                text: Some(r.to_string()),
+            },
+            None => Marker {
+                tag: LifecycleTag::Decision,
+                text: reason.map(String::from),
+            },
+        },
+        _ => Marker {
+            tag: LifecycleTag::Scaffold,
+            text: None,
+        },
+    }
+}
+
+/// Exit code: 0 done, 1 could not complete (nothing left half-written), 2 usage/tool error.
+pub async fn run(path: &str, dry_run: bool, force: bool, model: &str, format: OutputFormat) -> i32 {
+    let root = env::canonical_root(path);
+    let languages = detect::detect_languages(path);
+    let Some(&language) = languages.first() else {
+        display::print_error("no language detected.");
+        return 2;
+    };
+    if !dry_run && language != Language::Python {
+        display::print_error(&format!(
+            "writing tags is implemented for Python only ({language} detected). Use --dry-run to see the suggestions."
+        ));
+        return 2;
     }
 
-    let root = Path::new(path)
-        .canonicalize()
-        .unwrap_or_else(|_| Path::new(path).to_path_buf());
-    let primary_lang = languages[0];
-    let cache_path = Path::new(SUGGESTIONS_PATH);
-
-    // Try cache first (unless --force or --dry-run which always runs fresh)
-    let all_suggestions: Vec<FileSuggestions> = if !force && apply && cache_path.exists() {
-        println!("{} loading cached suggestions from {SUGGESTIONS_PATH}", "→".cyan());
-        match std::fs::read_to_string(cache_path) {
-            Ok(json) => match serde_json::from_str(&json) {
-                Ok(s) => s,
-                Err(e) => {
-                    display::print_warning(&format!("cache corrupt ({e}), running fresh session"));
-                    run_session(path, &languages, model, &root).await
-                }
-            },
-            Err(_) => run_session(path, &languages, model, &root).await,
+    let tests = tags::scan_test_files(&root.display().to_string(), &languages);
+    let mut untagged: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for test in tests.iter().filter(|t| t.tag == LifecycleTag::Untagged) {
+        untagged
+            .entry(relative(&test.file, &root))
+            .or_default()
+            .push(test.name.clone().unwrap_or_default());
+    }
+    let untagged_count: usize = untagged.values().map(Vec::len).sum();
+    if untagged_count == 0 {
+        if format == OutputFormat::Json {
+            print_json(&TagReport {
+                untagged_found: 0,
+                files: Vec::new(),
+                applied: false,
+                markers_written: 0,
+            });
+        } else {
+            display::print_success(&format!("all {} test(s) already tagged: nothing to do", tests.len()));
         }
+        return 0;
+    }
+
+    let kinhin_dir = root.join(".kinhin");
+    let cache_path = kinhin_dir.join(CACHE_FILE);
+    let cached: HashMap<String, Vec<TagSuggestion>> = if dry_run || force {
+        HashMap::new()
     } else {
-        run_session(path, &languages, model, &root).await
+        load_cache(&cache_path)
+            .map(|cache| cache.files.into_iter().map(|f| (f.file, f.suggestions)).collect())
+            .unwrap_or_default()
     };
 
-    if all_suggestions.is_empty() {
-        display::print_success("no suggestions generated");
-        return;
+    let mut results: Vec<FileSuggestions> = Vec::new();
+    let mut pending: Vec<(&String, &Vec<String>)> = Vec::new();
+    for (file, ids) in &untagged {
+        match cached.get(file) {
+            Some(suggestions) if ids.iter().all(|id| suggestions.iter().any(|s| s.test == *id)) => {
+                results.push(FileSuggestions {
+                    file: file.clone(),
+                    suggestions: suggestions.iter().filter(|s| ids.contains(&s.test)).cloned().collect(),
+                });
+            }
+            _ => pending.push((file, ids)),
+        }
+    }
+    if !results.is_empty() {
+        eprintln!(
+            "{} {} file(s) from cached suggestions ({})",
+            "→".cyan(),
+            results.len(),
+            cache_path.strip_prefix(&root).unwrap_or(&cache_path).display()
+        );
     }
 
-    // Always save to cache
-    if let Ok(json) = serde_json::to_string_pretty(&all_suggestions) {
-        let _ = std::fs::create_dir_all(".kinhin");
-        let _ = std::fs::write(cache_path, &json);
-    }
-
-    // Display
-    match format {
-        OutputFormat::Json => display_json(&all_suggestions),
-        OutputFormat::Rich => display_rich(&all_suggestions),
-    }
-
-    // Apply unless --dry-run
-    if apply {
-        let mut applied = 0;
-        let mut failed = 0;
-
-        for file_sugg in &all_suggestions {
-            let file_path = if Path::new(&file_sugg.file).is_relative() {
-                root.join(&file_sugg.file)
-            } else {
-                PathBuf::from(&file_sugg.file)
-            };
-
-            let Ok(content) = std::fs::read_to_string(&file_path) else {
-                display::print_warning(&format!("cannot read {}, skipping", file_sugg.file));
-                failed += 1;
+    let mut failed_files = 0;
+    if !pending.is_empty() {
+        let pending_tests: usize = pending.iter().map(|(_, ids)| ids.len()).sum();
+        eprintln!(
+            "{} classifying {pending_tests} untagged test(s) in {} file(s), one session, model {model}",
+            "→".cyan(),
+            pending.len()
+        );
+        let mut session = match agent::TaggerSession::connect(language, model, &kinhin_dir).await {
+            Ok(session) => session,
+            Err(e) => {
+                display::print_error(&format!("could not start the agent session: {e}"));
+                return 2;
+            }
+        };
+        let mut closed: Vec<agent::SessionMetrics> = Vec::new();
+        for (file, ids) in pending {
+            let Ok(content) = std::fs::read_to_string(root.join(file)) else {
+                display::print_error(&format!("cannot read {file}"));
+                failed_files += 1;
                 continue;
             };
-
-            let new_content = insert_tags(&content, &file_sugg.suggestions, primary_lang);
-
-            if new_content != content {
-                if let Err(e) = std::fs::write(&file_path, &new_content) {
-                    display::print_error(&format!("write failed {}: {e}", file_sugg.file));
-                    failed += 1;
-                } else {
-                    applied += 1;
+            eprintln!("  {} {file} ({} tests)", "·".cyan(), ids.len());
+            let mut outcome = session.tag_file(file, &content, ids).await;
+            if let Err(first_error) = &outcome {
+                // The CLI process behind a session can die mid-run: reconnect once and retry this file.
+                display::print_warning(&format!("{file}: {first_error}; reconnecting and retrying once"));
+                match agent::TaggerSession::connect(language, model, &kinhin_dir).await {
+                    Ok(fresh) => {
+                        let dead = std::mem::replace(&mut session, fresh);
+                        if let Ok(metrics) = dead.disconnect().await {
+                            closed.push(metrics);
+                        }
+                        outcome = session.tag_file(file, &content, ids).await;
+                    }
+                    Err(e) => display::print_error(&format!("could not reconnect: {e}")),
+                }
+            }
+            match outcome {
+                Ok(suggestions) => results.push(FileSuggestions {
+                    file: file.clone(),
+                    suggestions,
+                }),
+                Err(e) => {
+                    display::print_error(&format!("{file}: {e}"));
+                    failed_files += 1;
                 }
             }
         }
-
-        let total_tags: usize = all_suggestions.iter().map(|f| f.suggestions.len()).sum();
-        display::print_success(&format!("{applied} file(s) updated, {total_tags} tag(s) inserted"));
-        if failed > 0 {
-            display::print_warning(&format!("{failed} file(s) failed"));
+        match session.disconnect().await {
+            Ok(metrics) => closed.push(metrics),
+            Err(e) => display::print_warning(&format!("session did not close cleanly: {e}")),
         }
-
-        // Clear cache after successful apply
-        let _ = std::fs::remove_file(cache_path);
-    } else {
-        println!("\n  {} dry run — suggestions saved to {SUGGESTIONS_PATH}", "→".dimmed());
-        println!("  {} run `kinhin tag` to apply", "→".dimmed());
-    }
-}
-
-async fn run_session(
-    path: &str,
-    languages: &[Language],
-    model: Option<&str>,
-    root: &Path,
-) -> Vec<FileSuggestions> {
-    let tests = tags::scan_test_files(path, languages);
-    let untagged: Vec<&TaggedTest> = tests
-        .iter()
-        .filter(|t| t.tag == LifecycleTag::Untagged)
-        .collect();
-
-    if untagged.is_empty() {
-        display::print_success("all tests already tagged — nothing to do");
-        return Vec::new();
-    }
-
-    println!(
-        "{} {} untagged test(s) across {} file(s)",
-        "→".cyan(),
-        untagged.len(),
-        untagged.iter().map(|t| &t.file).collect::<std::collections::HashSet<_>>().len(),
-    );
-
-    let mut files_map: std::collections::BTreeMap<String, Vec<&TaggedTest>> =
-        std::collections::BTreeMap::new();
-    for test in &untagged {
-        files_map.entry(test.file.display().to_string()).or_default().push(test);
-    }
-
-    let primary_lang = languages[0];
-    let mut all_suggestions: Vec<FileSuggestions> = Vec::new();
-
-    let mut session = match agent::TaggerSession::connect(primary_lang, model).await {
-        Ok(s) => s,
-        Err(e) => {
-            display::print_error(&format!("failed to start agent session: {e}"));
-            std::process::exit(1);
+        eprintln!(
+            "  {} {} session(s): {} file(s), {} turn(s), ${:.4}",
+            "⧗".dimmed(),
+            closed.len(),
+            closed.iter().map(|m| m.files_processed).sum::<u32>(),
+            closed.iter().map(|m| m.total_turns).sum::<u32>(),
+            closed.iter().map(|m| m.total_cost_usd).sum::<f64>(),
+        );
+        for metrics in &closed {
+            if let Some(log) = &metrics.log_path {
+                eprintln!("    log {}", log.strip_prefix(&root).unwrap_or(log).display());
+            }
         }
+    }
+    results.sort_by(|a, b| a.file.cmp(&b.file));
+
+    // Save what we have: a failed file does not cost the others their work.
+    let cache = Cache {
+        schema_version: CACHE_SCHEMA,
+        model: model.to_string(),
+        files: results.clone(),
     };
-
-    for (file_path, _) in &files_map {
-        let Ok(content) = std::fs::read_to_string(file_path) else {
-            display::print_warning(&format!("cannot read {file_path}, skipping"));
-            continue;
-        };
-
-        let short = shorten(file_path, root);
-        println!("  {} {short}", "⠋".cyan());
-
-        match session.tag_file(&content).await {
-            Ok(suggestions) => {
-                all_suggestions.push(FileSuggestions { file: short, suggestions });
-            }
-            Err(e) => {
-                display::print_error(&format!("agent failed on {short}: {e}"));
-            }
-        }
+    let saved = std::fs::create_dir_all(&kinhin_dir).is_ok()
+        && std::fs::write(&cache_path, serde_json::to_string_pretty(&cache).expect("cache serializes")).is_ok();
+    if !saved {
+        display::print_warning(&format!("could not save suggestions to {}", cache_path.display()));
     }
 
-    match session.disconnect().await {
-        Ok(metrics) => {
+    if format == OutputFormat::Rich {
+        display_rich(&results);
+    }
+
+    if failed_files > 0 {
+        display::print_error(&format!(
+            "{failed_files} file(s) could not be classified; nothing was written. Run `kinhin tag` again: classified files are cached."
+        ));
+        return 1;
+    }
+
+    if dry_run {
+        if format == OutputFormat::Json {
+            print_json(&TagReport {
+                untagged_found: untagged_count,
+                files: results,
+                applied: false,
+                markers_written: 0,
+            });
+        } else {
             println!(
-                "\n  {} files: {}  turns: {}  cost: ${:.4}",
-                "⧗".dimmed(),
-                metrics.files_processed,
-                metrics.total_turns,
-                metrics.total_cost_usd,
+                "\n  {} dry run: nothing written. Run `kinhin tag` to apply these suggestions (no new session).",
+                "→".dimmed()
             );
         }
-        Err(e) => display::print_warning(&format!("session disconnect: {e}")),
+        return 0;
     }
 
-    all_suggestions
+    match apply(&root, &results) {
+        Ok(written) => {
+            let _ = std::fs::remove_file(&cache_path);
+            if format == OutputFormat::Json {
+                print_json(&TagReport {
+                    untagged_found: untagged_count,
+                    files: results,
+                    applied: true,
+                    markers_written: written,
+                });
+            } else {
+                let after = Census::from_tests(&tags::scan_test_files(&root.display().to_string(), &languages));
+                display::print_success(&format!(
+                    "{written} marker(s) written in {} file(s). Suite collects. Census: {}",
+                    results.len(),
+                    after.census_line()
+                ));
+            }
+            0
+        }
+        Err(message) => {
+            display::print_error(&message);
+            1
+        }
+    }
 }
 
-fn display_json(suggestions: &[FileSuggestions]) {
-    let total: usize = suggestions.iter().map(|f| f.suggestions.len()).sum();
-    let report = TagReport {
-        files_scanned: suggestions.len(),
-        untagged_found: total,
-        suggestions: suggestions.to_vec(),
+/// Write markers for every suggestion, then prove the suite still collects
+/// and that no test was left untagged. Any failure restores every file.
+fn apply(root: &Path, results: &[FileSuggestions]) -> Result<usize, String> {
+    let py = PyEnv::detect(root);
+    let mut originals: Vec<(PathBuf, String)> = Vec::new();
+    let mut with_new_import: Vec<PathBuf> = Vec::new();
+    let mut written = 0;
+
+    let restore = |originals: &[(PathBuf, String)]| {
+        for (path, content) in originals {
+            let _ = std::fs::write(path, content);
+        }
     };
-    println!("{}", serde_json::to_string_pretty(&report).unwrap());
+
+    let pyproject_path = root.join("pyproject.toml");
+    let mut width = pytests::DEFAULT_LINE_WIDTH;
+    if let Ok(content) = std::fs::read_to_string(&pyproject_path) {
+        width = pyproject::line_length(&content).unwrap_or(width);
+        originals.push((pyproject_path, content));
+    }
+    if let Err(reason) = pyproject::ensure_markers(root) {
+        return Err(format!("cannot register the lifecycle markers with pytest: {reason}"));
+    }
+
+    for file in results {
+        let path = root.join(&file.file);
+        let content = std::fs::read_to_string(&path).map_err(|e| {
+            restore(&originals);
+            format!("cannot read {}: {e}", file.file)
+        })?;
+        let markers: HashMap<String, Marker> =
+            file.suggestions.iter().map(|s| (s.test.clone(), marker_for(s))).collect();
+        let outcome = pytests::insert_markers(&content, &markers, width);
+        if outcome.inserted == 0 {
+            continue;
+        }
+        originals.push((path.clone(), content));
+        if let Err(e) = std::fs::write(&path, &outcome.content) {
+            restore(&originals);
+            return Err(format!("cannot write {}: {e}", file.file));
+        }
+        written += outcome.inserted;
+        if outcome.added_import {
+            with_new_import.push(path);
+        }
+    }
+
+    // `import pytest` was appended to the import block: let the project's
+    // own ruff put it where its isort rules want it.
+    pycheck::ruff_fix(&py, &with_new_import, "I");
+
+    if let Err(reason) = pycheck::collect(&py) {
+        restore(&originals);
+        return Err(format!("{reason}\n  every file was restored; no tag was written."));
+    }
+
+    let still_untagged = tags::scan_test_files(&root.display().to_string(), &[Language::Python])
+        .iter()
+        .filter(|t| t.tag == LifecycleTag::Untagged)
+        .count();
+    if still_untagged > 0 {
+        return Err(format!(
+            "{written} marker(s) written, but {still_untagged} test(s) are still untagged. Run `kinhin tag --force`."
+        ));
+    }
+    Ok(written)
 }
 
-fn display_rich(suggestions: &[FileSuggestions]) {
-    if suggestions.is_empty() {
+fn print_json(report: &TagReport) {
+    println!("{}", serde_json::to_string_pretty(report).expect("report serializes"));
+}
+
+fn display_rich(results: &[FileSuggestions]) {
+    if results.is_empty() {
         return;
     }
-
     let mut table = display::styled_table();
     table.set_header(vec![
         Cell::new("File").set_alignment(CellAlignment::Left),
         Cell::new("Test").set_alignment(CellAlignment::Left),
-        Cell::new("Suggested").set_alignment(CellAlignment::Left),
+        Cell::new("Tag").set_alignment(CellAlignment::Left),
         Cell::new("Reason").set_alignment(CellAlignment::Left),
         Cell::new("Ref").set_alignment(CellAlignment::Left),
     ]);
-
-    for file_sugg in suggestions {
-        for s in &file_sugg.suggestions {
-            let (color, icon) = tag_style(&s.tag);
+    for file in results {
+        for suggestion in &file.suggestions {
+            let marker = marker_for(suggestion);
+            let color = match marker.tag {
+                LifecycleTag::Decision => Color::Green,
+                LifecycleTag::Contract => Color::Blue,
+                LifecycleTag::Incident => Color::Red,
+                _ => Color::DarkGrey,
+            };
             table.add_row(vec![
-                Cell::new(&file_sugg.file),
-                Cell::new(&s.test),
-                Cell::new(format!("{icon} {}", s.tag)).fg(color),
-                Cell::new(&s.reason),
-                Cell::new(
-                    s.ref_value
-                        .as_deref()
-                        .unwrap_or("—"),
-                ),
+                Cell::new(&file.file),
+                Cell::new(&suggestion.test),
+                Cell::new(format!("{} {}", display::tag_icon(&marker.tag), marker.tag)).fg(color),
+                Cell::new(&suggestion.reason),
+                Cell::new(suggestion.ref_value.as_deref().unwrap_or("—")),
             ]);
         }
     }
-
     println!();
     display::print_titled(&format!("{}", "Tag Suggestions".bold()), &table);
 
-    let total: usize = suggestions.iter().map(|f| f.suggestions.len()).sum();
-    let scaffolds: usize = suggestions
+    let total: usize = results.iter().map(|f| f.suggestions.len()).sum();
+    let scaffolds = results
         .iter()
         .flat_map(|f| &f.suggestions)
-        .filter(|s| s.tag == "scaffold")
+        .filter(|s| marker_for(s).tag == LifecycleTag::Scaffold)
         .count();
-    let permanent = total - scaffolds;
-
-    println!();
     println!(
-        "  {} suggestions: {} scaffold, {} permanent",
-        total,
+        "\n  {total} suggestion(s): {} scaffold, {} permanent",
         scaffolds.to_string().dimmed(),
-        permanent.to_string().green(),
+        (total - scaffolds).to_string().green(),
     );
 }
 
-fn tag_style(tag: &str) -> (Color, &'static str) {
-    match tag {
-        "scaffold" => (Color::DarkGrey, "◇"),
-        "decision" => (Color::Green, "◆"),
-        "contract" => (Color::Blue, "◆"),
-        "incident" => (Color::Red, "⚡"),
-        _ => (Color::Yellow, "?"),
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-fn insert_tags(content: &str, suggestions: &[TagSuggestion], lang: Language) -> String {
-    let needs_pytest_markers = lang == Language::Python && !suggestions.is_empty();
-
-    if needs_pytest_markers && !content.contains("import pytest") {
-        let lines: Vec<&str> = content.lines().collect();
-        let mut result: Vec<String> = Vec::with_capacity(lines.len() + 2);
-        let mut insert_idx = 0;
-        for (i, line) in lines.iter().enumerate() {
-            let trimmed = line.trim();
-            if trimmed.starts_with("import ") || trimmed.starts_with("from ") {
-                insert_idx = i + 1;
-            }
-        }
-        for (i, line) in lines.iter().enumerate() {
-            if i == insert_idx {
-                result.push("import pytest".to_string());
-                result.push(String::new());
-            }
-            result.push(line.to_string());
-        }
-        let new_content = result.join("\n");
-        return insert_tags_inner(&new_content, suggestions, lang);
-    }
-
-    insert_tags_inner(content, suggestions, lang)
-}
-
-fn insert_tags_inner(content: &str, suggestions: &[TagSuggestion], lang: Language) -> String {
-    let lines: Vec<&str> = content.lines().collect();
-    let mut result: Vec<String> = Vec::with_capacity(lines.len() + suggestions.len());
-    let mut tagged_tests: std::collections::HashMap<&str, &TagSuggestion> =
-        suggestions.iter().map(|s| (s.test.as_str(), s)).collect();
-
-    for line in &lines {
-        // Check if this line defines a test function that we have a suggestion for
-        let test_name = extract_test_name(line, lang);
-        if let Some(name) = test_name {
-            if let Some(suggestion) = tagged_tests.remove(name) {
-                let marker = format_marker(suggestion, lang);
-                if !marker.is_empty() {
-                    // Detect indentation
-                    let indent: String = line.chars().take_while(|c| c.is_whitespace()).collect();
-                    result.push(format!("{indent}{marker}"));
-                }
-            }
-        }
-        result.push(line.to_string());
-    }
-
-    result.join("\n") + if content.ends_with('\n') { "\n" } else { "" }
-}
-
-fn extract_test_name<'a>(line: &'a str, lang: Language) -> Option<&'a str> {
-    let trimmed = line.trim();
-    match lang {
-        Language::Python => {
-            if trimmed.starts_with("def test_") || trimmed.starts_with("async def test_") {
-                let start = trimmed.find("test_")?;
-                let rest = &trimmed[start..];
-                let end = rest.find('(')?;
-                Some(&rest[..end])
-            } else {
-                None
-            }
-        }
-        Language::Rust => {
-            if trimmed.starts_with("fn test_") || trimmed.starts_with("fn ") && trimmed.contains("test") {
-                let start = trimmed.find("fn ")? + 3;
-                let rest = &trimmed[start..];
-                let end = rest.find('(').unwrap_or(rest.len());
-                Some(&rest[..end])
-            } else {
-                None
-            }
-        }
-        Language::Java => {
-            if trimmed.starts_with("void test") || trimmed.starts_with("public void test") {
-                let start = trimmed.find("test")?;
-                let rest = &trimmed[start..];
-                let end = rest.find('(').unwrap_or(rest.len());
-                Some(&rest[..end])
-            } else {
-                None
-            }
-        }
-        Language::TypeScript => {
-            None // TS uses file-suffix convention, not inline markers
+    fn suggestion(tag: &str, reason: &str, reference: Option<&str>) -> TagSuggestion {
+        TagSuggestion {
+            test: "t".into(),
+            tag: tag.into(),
+            reason: reason.into(),
+            ref_value: reference.map(String::from),
         }
     }
-}
 
-fn format_marker(suggestion: &TagSuggestion, lang: Language) -> String {
-    let ref_str = suggestion.ref_value.as_deref().unwrap_or("");
-
-    match lang {
-        Language::Python => match suggestion.tag.as_str() {
-            "scaffold" => "@pytest.mark.scaffold".to_string(),
-            "decision" => {
-                let reason = &suggestion.reason;
-                format!("@pytest.mark.decision(reason=\"{reason}\")")
-            }
-            "contract" => format!("@pytest.mark.contract(party=\"{ref_str}\")"),
-            "incident" => format!("@pytest.mark.incident(ref=\"{ref_str}\")"),
-            _ => String::new(),
-        },
-        Language::Rust => match suggestion.tag.as_str() {
-            "scaffold" => String::new(), // Rust uses mod scaffold, handled differently
-            "decision" => format!("// kinhin: decision(ref=\"{ref_str}\")"),
-            "contract" => format!("// kinhin: contract(ref=\"{ref_str}\")"),
-            "incident" => format!("// kinhin: incident(ref=\"{ref_str}\")"),
-            _ => String::new(),
-        },
-        Language::Java => match suggestion.tag.as_str() {
-            "scaffold" => "@Tag(\"scaffold\")".to_string(),
-            "decision" => format!("@Tag(\"decision\") // {}", suggestion.reason),
-            "contract" => format!("@Tag(\"contract\") // {ref_str}"),
-            "incident" => format!("@Tag(\"incident\") // {ref_str}"),
-            _ => String::new(),
-        },
-        Language::TypeScript => String::new(), // TS uses file-suffix convention
+    #[test]
+    fn incident_without_a_ticket_is_written_as_a_decision() {
+        let marker = marker_for(&suggestion("incident", "crashed on empty file", None));
+        assert_eq!(marker.tag, LifecycleTag::Decision);
+        assert_eq!(marker.text.as_deref(), Some("crashed on empty file"));
     }
-}
 
-fn shorten(path: &str, root: &Path) -> String {
-    let p = Path::new(path);
-    p.strip_prefix(root)
-        .unwrap_or(p)
-        .display()
-        .to_string()
+    #[test]
+    fn contract_prefers_the_named_consumer_over_the_reason() {
+        let marker = marker_for(&suggestion("contract", "pins output", Some("CLI users")));
+        assert_eq!(marker.text.as_deref(), Some("CLI users"));
+        let fallback = marker_for(&suggestion("contract", "pins output", Some("null")));
+        assert_eq!(fallback.text.as_deref(), Some("pins output"));
+    }
+
+    #[test]
+    fn unknown_tag_becomes_scaffold() {
+        assert_eq!(marker_for(&suggestion("keep", "", None)).tag, LifecycleTag::Scaffold);
+    }
 }

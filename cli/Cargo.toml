@@ -19,12 +19,10 @@ serde_json = "1"
 walkdir = "2"
 regex = "1"
 owo-colors = "4"
-thiserror = "2"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 claude-agent-toolkit = { git = "https://github.com/daviguides/claude-agent-toolkit.git" }
 tokio = { version = "1", features = ["process", "rt", "rt-multi-thread", "io-util", "sync", "macros", "time"] }
 futures = "0.3"
 tempfile = "3"
 anyhow = "1"
 chrono = "0.4"
+toml_edit = "0.25"
