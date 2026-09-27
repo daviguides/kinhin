@@ -337,9 +337,10 @@ def sample_amount() -> Decimal:
 ```
 
 ### Test Markers
-**Requirement**: Use markers to categorize tests.
+**Requirement**: Use markers to categorize tests by purpose AND lifecycle.
 
-**Pattern:**
+#### Category Markers
+
 ```python
 import pytest
 
@@ -357,7 +358,151 @@ def test_performance() -> None:
     """Performance test example."""
 ```
 
+#### Lifecycle Markers
+
+**Requirement**: Every test carries a lifecycle marker at birth. Untagged = `scaffold` by default.
+
+**Registration** — add to `pyproject.toml`:
+```toml
+[tool.pytest.ini_options]
+markers = [
+    "scaffold: construction-time verification, deleted at prune",
+    "decision: encodes a non-obvious decision (reason required)",
+    "contract: pins a boundary another party depends on (party required)",
+    "incident: reproduces a production failure (ref required)",
+]
+addopts = "--strict-markers"
+```
+
+`--strict-markers` fails collection on an unregistered marker — no typos, no silent drift.
+
+**Usage:**
+```python
+@pytest.mark.scaffold
+def test_parser_returns_dict() -> None:
+    """Scaffold: verifies basic return shape during construction."""
+
+@pytest.mark.decision(reason="deny before soft-delete because DENIED is terminal")
+def test_deny_precedes_soft_delete() -> None:
+    """Decision: ordering invariant in the cleanup pipeline."""
+
+@pytest.mark.contract(party="iOS BrandDetails v2")
+def test_brand_details_wire_format() -> None:
+    """Contract: serialization shape consumed by the iOS client."""
+
+@pytest.mark.incident(ref="TRYPLAT-186")
+def test_scan_match_never_walks_keyspace() -> None:
+    """Incident: Redis SCAN walked 250k keys on every write."""
+```
+
+**The delete set** — list every scaffold in the project:
+```bash
+pytest -m scaffold --collect-only -q
+```
+
+**CI exclusion** — production gate runs only permanent tests:
+```toml
+# pyproject.toml or pytest.ini
+[tool.pytest.ini_options]
+# CI profile: exclude scaffold
+# Run as: pytest -m "not scaffold"
+```
+
+**Promotion** — during prune, a scaffold that turns out to encode a real decision gets re-tagged with a reason:
+```python
+# Before (scaffold during construction):
+@pytest.mark.scaffold
+def test_discount_never_negative() -> None: ...
+
+# After prune (promoted — encodes a business invariant):
+@pytest.mark.decision(reason="discount is non-negative by contract with billing")
+def test_discount_never_negative() -> None: ...
+```
+
+## Runner Configuration
+
+**Requirement**: Configure the test runner for code-assistant batch workflows. Serial execution with bail-on-first-failure fights the batch processing principle.
+
+### Recommended addopts
+
+```toml
+[tool.pytest.ini_options]
+addopts = "-n auto -p randomly --maxfail=0 -ra -q --strict-markers"
+```
+
+| Flag | Purpose |
+|---|---|
+| `-n auto` | pytest-xdist: parallel execution, one worker per core |
+| `-p randomly` | pytest-randomly: randomized order, seed printed at start |
+| `--maxfail=0` | No limit — never bail on first failure |
+| `-ra` | Show summary of all non-passing tests at end |
+| `-q` | Quiet — reduce noise, keep signal |
+| `--strict-markers` | Fail on unregistered markers |
+
+**Explicitly forbidden:** `-x` / `--exitfirst` in batch mode. Use `-x` ONLY in diagnostic mode (isolating a single flake manually).
+
+### Required Plugins
+
+| Plugin | Purpose | Install |
+|---|---|---|
+| `pytest-xdist` | Parallel execution with per-worker isolation | `pip install pytest-xdist` |
+| `pytest-randomly` | Randomized order; seed printed for reproduction | `pip install pytest-randomly` |
+| `pytest-json-report` | Structured JSON output for assistant consumption | `pip install pytest-json-report` |
+| `pytest-testmon` | Changed-set selection (only tests affected by edits) | `pip install pytest-testmon` |
+
+**Optional (flake protocol only):**
+
+| Plugin | Purpose |
+|---|---|
+| `pytest-rerunfailures` | Rerun failures for flake classification — ONLY under the three-run protocol, NEVER as retry-until-green |
+| `mutmut` | Mutation testing for post-prune verification |
+
+### Three-Run Flake Protocol (Concrete Commands)
+
+When a test fails in the full run:
+
+```bash
+# Step 1: Rerun the failure isolated, 3 times
+pytest tests/test_failing.py::test_name --count=3 -p no:randomly
+
+# If all 3 fail → deterministic-fail. Fix the code.
+
+# Step 2: If any pass, rerun with the original seed
+pytest -p randomly --randomly-seed=<SEED_FROM_ORIGINAL_RUN>
+
+# If fails → isolation-dependent (shared state bug). Fix now.
+# If passes → flaky. Quarantine with a ticket. Never retry-to-green.
+```
+
+### Changed-Set Selection
+
+Inner loop (during development):
+```bash
+pytest --testmon          # only tests affected by changed files
+# or the cheap fallback:
+pytest --lf --ff          # last-failed first, then the rest
+```
+
+Gate (before PR):
+```bash
+pytest -m "not scaffold"  # full suite, permanent tests only
+```
+
+Selection NEVER replaces the full gate run.
+
 ## Python-Specific Coverage
+
+### Construction vs Retention
+
+Coverage metrics serve two different purposes at two different times:
+
+- **At GREEN (construction-time):** ≥90% branch coverage on changed code. Scaffolds exist to satisfy this — they prove the assistant explored the input space.
+- **After PRUNE (retention):** mutation parity on changed files (K₁ ⊇ K₀). Branch coverage MAY drop below 90% after pruning scaffolds — that is expected and correct. An 80% floor is a smoke alarm, not a gate.
+
+Use `mutmut` scoped to the diff for the post-prune pass:
+```bash
+mutmut run --paths-to-mutate=src/changed_module.py
+```
 
 ### Coverage Exclusions
 **Requirement**: Exclude Python-specific patterns from coverage.
