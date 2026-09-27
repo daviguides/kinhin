@@ -208,12 +208,125 @@ fn reports_dirty_repos_only() { ... }
 fn scan_command_exits_nonzero_on_missing_root() { ... }
 ```
 
+## Lifecycle Tagging
+
+Rust has no built-in marker system. Use module naming and doc comments.
+
+### Scaffold Tests — `mod scaffold`
+
+**Requirement**: Construction-time tests live in a `mod scaffold` inside `#[cfg(test)]`.
+
+```rust
+#[cfg(test)]
+mod tests {
+    // Permanent tests live here at the top level
+
+    mod scaffold {
+        // Construction-time verification — deleted at prune
+        use super::*;
+
+        #[test]
+        fn parser_returns_expected_keys() { ... }
+
+        #[test]
+        fn validator_rejects_empty_string() { ... }
+    }
+}
+```
+
+**The delete set** — list every scaffold in the crate:
+```bash
+cargo test scaffold:: -- --list
+```
+
+### Permanent Tests — Doc Comment Tags
+
+**Requirement**: Every permanent test carries a `// kinhin:` doc comment with its tag and reference.
+
+```rust
+// kinhin: decision(ref="docs/payments/fees.md#rate-protection")
+#[test]
+fn grace_period_uses_higher_of_old_and_new_set() { ... }
+
+// kinhin: contract(ref="API v2 wire format")
+#[test]
+fn serialize_roundtrip_preserves_all_fields() { ... }
+
+// kinhin: incident(ref="ISSUE-186")
+#[test]
+fn invalidation_never_scans_keyspace() { ... }
+```
+
+Do NOT invent `cfg` features for lifecycle tags — `cfg(scaffold)` would require a feature flag and complicate the build.
+
+### CI Exclusion
+
+The CI gate runs the full suite excluding scaffolds:
+```bash
+cargo nextest run --filter-expr 'not test(scaffold::)'
+```
+
+## Runner Configuration
+
+**Requirement**: Use cargo-nextest, not `cargo test`. The built-in runner lacks per-test process isolation and structured output.
+
+### nextest Configuration (`.config/nextest.toml`)
+
+```toml
+[profile.default]
+fail-fast = false           # never bail — report all failures
+test-threads = "num-cpus"   # parallel by default
+
+[profile.ci]
+fail-fast = false
+# JUnit XML for structured consumption
+[profile.ci.junit]
+path = "target/nextest/ci/junit.xml"
+```
+
+### Execution
+
+```bash
+# Inner loop (changed crate only):
+cargo nextest run -p <changed_crate> --no-fail-fast
+
+# Full gate (before PR, excluding scaffolds):
+cargo nextest run --filter-expr 'not test(scaffold::)' --profile ci
+
+# Diagnostic mode (isolate a flake):
+cargo nextest run --no-fail-fast -j 1 --filter-expr 'test(the_flaky_test)'
+```
+
+### Randomized Order
+
+nextest runs tests in a non-deterministic order by default (per-test process isolation). For reproducible ordering, use `--seed <N>` when available, or randomize with a wrapper script.
+
+### Changed-Set Selection
+
+nextest has no import-graph selection. Use crate-level selection:
+```bash
+cargo nextest run -p <crate1> -p <crate2>  # only changed crates
+```
+
+### Mutation Testing
+
+Use `cargo-mutants` scoped to the diff for the post-prune pass:
+```bash
+cargo mutants --in-diff HEAD~1
+```
+
 ## Coverage
+
+### Construction vs Retention
 
 Same universal targets (scenario 100%, branch ≥ 90%, constraints
 100%), measured with `cargo llvm-cov nextest`. Type-eliminated
 scenarios (Principle 1) count as covered BY CONSTRUCTION — document
 the type, not a redundant test.
+
+**At GREEN (construction-time):** ≥90% branch on changed code. Scaffolds exist to satisfy this.
+
+**After PRUNE (retention):** mutation parity on changed files (K₁ ⊇ K₀). Branch coverage MAY drop — that is expected after removing scaffolds.
 
 ## Anti-Hallucination (Rust Form)
 
