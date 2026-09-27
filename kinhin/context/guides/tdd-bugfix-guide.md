@@ -42,6 +42,8 @@ Generate comprehensive bug analysis.
 
 **Objective**: Create test that fails due to the bug.
 
+**Lifecycle Tag**: The reproduction test is `@incident(ref=<ticket>)` at birth. It reproduces a real production failure and is permanent by definition — it is the regression guard that ensures this specific bug never returns.
+
 **Test Requirements:**
 - Test must fail with current buggy code
 - Test must clearly demonstrate the bug
@@ -92,6 +94,8 @@ def test_discount_calculation_handles_zero_amount() -> None:
 
 **Objective**: Identify related scenarios that might have same bug.
 
+**Lifecycle Tag**: Tests born in this phase are `@scaffold`. They are exploratory — probing whether the bug's root cause affects other paths. Most will be deleted or collapsed into the reproduction test during the Prune phase.
+
 **Considerations:**
 - Similar input patterns
 - Related functions
@@ -141,15 +145,22 @@ Requirements:
 Generate fix that satisfies all requirements.
 ```
 
-### Phase 5: Regression Test Suite
+### Phase 5: Graduate and Prune
 
-**Objective**: Ensure bug won't reoccur and related bugs are prevented.
+**Objective**: Keep the incident test, graduate any scaffold that encodes a real decision, delete the rest.
 
-**Regression Tests Include:**
-- Original bug reproduction test
-- Related scenario tests
-- Boundary condition tests
-- Error handling tests
+**The reproduction test (`@incident`) survives unconditionally** — it is the permanent regression guard.
+
+**Phase 3 scaffold tests are evaluated:**
+- Does the scenario encode a non-obvious decision about error handling? → Graduate to `@decision(ref=)` with a stated reason.
+- Does it cover the same equivalence class as the reproduction test? → Collapse into the reproduction test as an additional parametrized row, or delete.
+- Is it a different bug entirely? → Separate it into its own `@incident(ref=)` with its own ticket.
+
+**Mutation parity**: Run mutation testing on changed files. The surviving suite must kill every mutant the full suite killed. If a mutant escapes, restore or write the decision test it implies.
+
+**PR census line**: `written N / pruned M / survivors: X decision, Y contract, Z incident`.
+
+**Previous Phase 5 content (still applies):**
 
 **Prompt Template:**
 ```
@@ -285,6 +296,10 @@ Verify fix makes all new tests pass without breaking existing tests.
 ### Hasty Fixes
 **Problem**: Quick patch without understanding.
 **Solution**: Invest time in proper analysis and test-driven fix.
+
+### Keeping Every Exploratory Test
+**Problem**: Phase 3 exploratory tests survive as permanent regression tests. They probe related scenarios during investigation but most cover the same root cause as the reproduction test. Keeping them all creates maintenance drag on every future change near the bug.
+**Solution**: Phase 5 (Graduate and Prune). The reproduction test (`@incident`) is the permanent guard. Exploratory tests collapse into it or die.
 
 ## Bug Categories and Approaches
 
