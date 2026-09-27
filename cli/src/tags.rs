@@ -96,7 +96,7 @@ pub fn scan_test_files(root: &str, languages: &[Language]) -> Vec<TaggedTest> {
     results
 }
 
-fn is_test_file(name: &str, path: &Path, lang: Language) -> bool {
+fn is_test_file(name: &str, _path: &Path, lang: Language) -> bool {
     match lang {
         Language::Python => {
             name.starts_with("test_") && name.ends_with(".py")
@@ -175,10 +175,10 @@ fn parse_rust_tags(path: &Path, content: &str) -> Vec<TaggedTest> {
         return results;
     }
 
-    let in_scaffold = Regex::new(r"(?m)mod scaffold\s*\{").unwrap();
+    let _in_scaffold = Regex::new(r"(?m)mod scaffold\s*\{").unwrap();
     let re_test = Regex::new(r"(?m)^\s*(?:#\[test\]|#\[rstest\])").unwrap();
     let re_fn = Regex::new(r"(?m)^\s*fn (\w+)").unwrap();
-    let re_kinhin = Regex::new(r"// kinhin: (\w+)\(ref=[\"']([^\"']+)[\"']\)").unwrap();
+    let re_kinhin = Regex::new(r#"// kinhin: (\w+)\(ref=["']([^"']+)["']\)"#).unwrap();
 
     let scaffold_ranges = find_mod_scaffold_ranges(content);
     let lines: Vec<&str> = content.lines().collect();
@@ -325,7 +325,7 @@ fn parse_typescript_tags(path: &Path, content: &str) -> Vec<TaggedTest> {
     let is_scaffold_file = file_name.contains(".scaffold.");
 
     let re_it = Regex::new(r#"(?m)^\s*(?:it|test)\s*\(\s*['"](.*?)['"]\s*,"#).unwrap();
-    let re_kinhin = Regex::new(r"// @(decision|contract|incident)\(ref=[\"']([^\"']+)[\"']\)").unwrap();
+    let re_kinhin = Regex::new(r#"// @(decision|contract|incident)\(ref=["']([^"']+)["']\)"#).unwrap();
 
     let lines: Vec<&str> = content.lines().collect();
 

@@ -101,7 +101,7 @@ impl Census {
             Cell::new(""),
         ]);
 
-        display::print_titled(&format!("{}", "Test Census".bold()), "Test Census".len(), &table);
+        display::print_titled(&format!("{}", "Test Census".bold()), &table);
 
         if self.untagged > 0 {
             display::print_warning(&format!(
