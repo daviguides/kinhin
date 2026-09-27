@@ -16,16 +16,19 @@ struct TagReport {
     suggestions: Vec<FileSuggestions>,
 }
 
-#[derive(serde::Serialize)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 struct FileSuggestions {
     file: String,
     suggestions: Vec<TagSuggestion>,
 }
 
+const SUGGESTIONS_PATH: &str = ".kinhin/tag-suggestions.json";
+
 pub async fn run(
     path: &str,
     lang: Option<Language>,
     apply: bool,
+    force: bool,
     model: Option<&str>,
     format: OutputFormat,
 ) {
@@ -38,98 +41,47 @@ pub async fn run(
         std::process::exit(1);
     }
 
-    let tests = tags::scan_test_files(path, &languages);
-    let untagged: Vec<&TaggedTest> = tests
-        .iter()
-        .filter(|t| t.tag == LifecycleTag::Untagged)
-        .collect();
-
-    if untagged.is_empty() {
-        display::print_success("all tests already tagged — nothing to do");
-        return;
-    }
-
-    println!(
-        "{} {} untagged test(s) across {} file(s)",
-        "→".cyan(),
-        untagged.len(),
-        untagged
-            .iter()
-            .map(|t| &t.file)
-            .collect::<std::collections::HashSet<_>>()
-            .len(),
-    );
-
-    // Group untagged tests by file
-    let mut files_map: std::collections::BTreeMap<String, Vec<&TaggedTest>> =
-        std::collections::BTreeMap::new();
-
-    for test in &untagged {
-        let key = test.file.display().to_string();
-        files_map.entry(key).or_default().push(test);
-    }
-
     let root = Path::new(path)
         .canonicalize()
         .unwrap_or_else(|_| Path::new(path).to_path_buf());
-
     let primary_lang = languages[0];
-    let mut all_suggestions: Vec<FileSuggestions> = Vec::new();
+    let cache_path = Path::new(SUGGESTIONS_PATH);
 
-    let mut session = match agent::TaggerSession::connect(primary_lang, model).await {
-        Ok(s) => s,
-        Err(e) => {
-            display::print_error(&format!("failed to start agent session: {e}"));
-            std::process::exit(1);
+    // Try cache first (unless --force or --dry-run which always runs fresh)
+    let all_suggestions: Vec<FileSuggestions> = if !force && apply && cache_path.exists() {
+        println!("{} loading cached suggestions from {SUGGESTIONS_PATH}", "→".cyan());
+        match std::fs::read_to_string(cache_path) {
+            Ok(json) => match serde_json::from_str(&json) {
+                Ok(s) => s,
+                Err(e) => {
+                    display::print_warning(&format!("cache corrupt ({e}), running fresh session"));
+                    run_session(path, &languages, model, &root).await
+                }
+            },
+            Err(_) => run_session(path, &languages, model, &root).await,
         }
+    } else {
+        run_session(path, &languages, model, &root).await
     };
 
-    for (file_path, _file_tests) in &files_map {
-        let Ok(content) = std::fs::read_to_string(file_path) else {
-            display::print_warning(&format!("cannot read {file_path}, skipping"));
-            continue;
-        };
-
-        println!("  {} {}", "⠋".cyan(), shorten(file_path, &root));
-
-        match session.tag_file(&content).await {
-            Ok(suggestions) => {
-                all_suggestions.push(FileSuggestions {
-                    file: shorten(file_path, &root),
-                    suggestions,
-                });
-            }
-            Err(e) => {
-                display::print_error(&format!("agent failed on {}: {e}", shorten(file_path, &root)));
-            }
-        }
+    if all_suggestions.is_empty() {
+        display::print_success("no suggestions generated");
+        return;
     }
 
-    match session.disconnect().await {
-        Ok(metrics) => {
-            println!(
-                "\n  {} files: {}  turns: {}  cost: ${:.4}",
-                "⧗".dimmed(),
-                metrics.files_processed,
-                metrics.total_turns,
-                metrics.total_cost_usd,
-            );
-        }
-        Err(e) => display::print_warning(&format!("session disconnect: {e}")),
+    // Always save to cache
+    if let Ok(json) = serde_json::to_string_pretty(&all_suggestions) {
+        let _ = std::fs::create_dir_all(".kinhin");
+        let _ = std::fs::write(cache_path, &json);
     }
 
+    // Display
     match format {
-        OutputFormat::Json => display_json(&all_suggestions, untagged.len()),
+        OutputFormat::Json => display_json(&all_suggestions),
         OutputFormat::Rich => display_rich(&all_suggestions),
     }
 
-    // Save suggestions for reuse
-    let suggestions_path = Path::new(".kinhin").join("tag-suggestions.json");
-    if let Ok(json) = serde_json::to_string_pretty(&all_suggestions) {
-        let _ = std::fs::create_dir_all(".kinhin");
-        let _ = std::fs::write(&suggestions_path, &json);
-    }
-
+    // Apply unless --dry-run
     if apply {
         let mut applied = 0;
         let mut failed = 0;
@@ -142,7 +94,7 @@ pub async fn run(
             };
 
             let Ok(content) = std::fs::read_to_string(&file_path) else {
-                display::print_warning(&format!("cannot read {}, skipping apply", file_sugg.file));
+                display::print_warning(&format!("cannot read {}, skipping", file_sugg.file));
                 failed += 1;
                 continue;
             };
@@ -164,13 +116,96 @@ pub async fn run(
         if failed > 0 {
             display::print_warning(&format!("{failed} file(s) failed"));
         }
+
+        // Clear cache after successful apply
+        let _ = std::fs::remove_file(cache_path);
+    } else {
+        println!("\n  {} dry run — suggestions saved to {SUGGESTIONS_PATH}", "→".dimmed());
+        println!("  {} run `kinhin tag` to apply", "→".dimmed());
     }
 }
 
-fn display_json(suggestions: &[FileSuggestions], untagged_count: usize) {
+async fn run_session(
+    path: &str,
+    languages: &[Language],
+    model: Option<&str>,
+    root: &Path,
+) -> Vec<FileSuggestions> {
+    let tests = tags::scan_test_files(path, languages);
+    let untagged: Vec<&TaggedTest> = tests
+        .iter()
+        .filter(|t| t.tag == LifecycleTag::Untagged)
+        .collect();
+
+    if untagged.is_empty() {
+        display::print_success("all tests already tagged — nothing to do");
+        return Vec::new();
+    }
+
+    println!(
+        "{} {} untagged test(s) across {} file(s)",
+        "→".cyan(),
+        untagged.len(),
+        untagged.iter().map(|t| &t.file).collect::<std::collections::HashSet<_>>().len(),
+    );
+
+    let mut files_map: std::collections::BTreeMap<String, Vec<&TaggedTest>> =
+        std::collections::BTreeMap::new();
+    for test in &untagged {
+        files_map.entry(test.file.display().to_string()).or_default().push(test);
+    }
+
+    let primary_lang = languages[0];
+    let mut all_suggestions: Vec<FileSuggestions> = Vec::new();
+
+    let mut session = match agent::TaggerSession::connect(primary_lang, model).await {
+        Ok(s) => s,
+        Err(e) => {
+            display::print_error(&format!("failed to start agent session: {e}"));
+            std::process::exit(1);
+        }
+    };
+
+    for (file_path, _) in &files_map {
+        let Ok(content) = std::fs::read_to_string(file_path) else {
+            display::print_warning(&format!("cannot read {file_path}, skipping"));
+            continue;
+        };
+
+        let short = shorten(file_path, root);
+        println!("  {} {short}", "⠋".cyan());
+
+        match session.tag_file(&content).await {
+            Ok(suggestions) => {
+                all_suggestions.push(FileSuggestions { file: short, suggestions });
+            }
+            Err(e) => {
+                display::print_error(&format!("agent failed on {short}: {e}"));
+            }
+        }
+    }
+
+    match session.disconnect().await {
+        Ok(metrics) => {
+            println!(
+                "\n  {} files: {}  turns: {}  cost: ${:.4}",
+                "⧗".dimmed(),
+                metrics.files_processed,
+                metrics.total_turns,
+                metrics.total_cost_usd,
+            );
+        }
+        Err(e) => display::print_warning(&format!("session disconnect: {e}")),
+    }
+
+    all_suggestions
+}
+
+fn display_json(suggestions: &[FileSuggestions]) {
+    let total: usize = suggestions.iter().map(|f| f.suggestions.len()).sum();
     let report = TagReport {
         files_scanned: suggestions.len(),
-        untagged_found: untagged_count,
+        untagged_found: total,
         suggestions: suggestions.to_vec(),
     };
     println!("{}", serde_json::to_string_pretty(&report).unwrap());
@@ -366,14 +401,4 @@ fn shorten(path: &str, root: &Path) -> String {
         .unwrap_or(p)
         .display()
         .to_string()
-}
-
-// Make FileSuggestions cloneable for the JSON report
-impl Clone for FileSuggestions {
-    fn clone(&self) -> Self {
-        Self {
-            file: self.file.clone(),
-            suggestions: self.suggestions.clone(),
-        }
-    }
 }

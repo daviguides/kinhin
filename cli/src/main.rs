@@ -106,9 +106,13 @@ enum Commands {
         #[arg(long, value_enum)]
         lang: Option<detect::Language>,
 
-        /// Preview suggestions without applying (default: apply)
+        /// Preview only — run session, save suggestions, don't apply
         #[arg(long)]
         dry_run: bool,
+
+        /// Ignore cached suggestions, run a new session
+        #[arg(long)]
+        force: bool,
 
         /// Model to use for tagging (default: haiku for cost efficiency)
         #[arg(long, default_value = "haiku")]
@@ -204,11 +208,12 @@ fn main() {
         Commands::Tag {
             lang,
             dry_run,
+            force,
             ref model,
             ref path,
         } => {
             let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
-            rt.block_on(tag::run(path, lang, !dry_run, Some(model), cli.output));
+            rt.block_on(tag::run(path, lang, !dry_run, force, Some(model), cli.output));
         }
         Commands::Prune {
             lang,
