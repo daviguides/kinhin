@@ -118,6 +118,14 @@ pub async fn run(
 
         let primary_lang = languages[0];
 
+        let session = match agent::TaggerSession::connect(primary_lang).await {
+            Ok(s) => Some(s),
+            Err(e) => {
+                display::print_warning(&format!("agent session failed: {e}, treating untagged as scaffold"));
+                None
+            }
+        };
+
         // Group by file
         let mut file_groups: BTreeMap<String, Vec<&TaggedTest>> = BTreeMap::new();
         for test in &untagged {
@@ -125,23 +133,29 @@ pub async fn run(
             file_groups.entry(key).or_default().push(test);
         }
 
-        for (file_path, _) in &file_groups {
-            let Ok(content) = std::fs::read_to_string(file_path) else {
-                continue;
-            };
+        if let Some(session) = session {
+            for (file_path, _) in &file_groups {
+                let Ok(content) = std::fs::read_to_string(file_path) else {
+                    continue;
+                };
 
-            println!("  {} {}", "⠋".cyan(), shorten(file_path, &root));
+                println!("  {} {}", "⠋".cyan(), shorten(file_path, &root));
 
-            match agent::tag_session(&content, primary_lang).await {
-                Ok(suggestions) => {
-                    for s in suggestions {
-                        let key = format!("{}::{}", file_path, s.test);
-                        classified_tags.insert(key, s.tag);
+                match session.tag_file(&content).await {
+                    Ok(suggestions) => {
+                        for s in suggestions {
+                            let key = format!("{}::{}", file_path, s.test);
+                            classified_tags.insert(key, s.tag);
+                        }
+                    }
+                    Err(e) => {
+                        display::print_warning(&format!("agent failed: {e}"));
                     }
                 }
-                Err(e) => {
-                    display::print_warning(&format!("agent failed: {e}"));
-                }
+            }
+
+            if let Err(e) = session.disconnect().await {
+                display::print_warning(&format!("session disconnect: {e}"));
             }
         }
     }

@@ -32,65 +32,73 @@ pub struct TagSuggestion {
     pub ref_value: Option<String>,
 }
 
-pub async fn tag_session(
-    test_file_content: &str,
+pub struct TaggerSession {
+    client: ClaudeClient,
     language: Language,
-) -> anyhow::Result<Vec<TagSuggestion>> {
-    let sandbox = tempfile::tempdir()?;
+}
 
-    let options = ClaudeAgentOptions::builder()
-        .cwd(sandbox.path())
-        .permission_mode(PermissionMode::BypassPermissions)
-        .system_prompt(SystemPrompt::Preset {
-            preset: "claude_code".to_string(),
-            append: Some(TAGGER_SYSTEM_PROMPT.to_string()),
-            exclude_dynamic_sections: None,
-        })
-        .max_turns(1)
-        .build();
+impl TaggerSession {
+    pub async fn connect(language: Language) -> anyhow::Result<Self> {
+        let sandbox = tempfile::tempdir()?;
 
-    let mut client = ClaudeClient::connect(options).await?;
+        let options = ClaudeAgentOptions::builder()
+            .cwd(sandbox.path())
+            .permission_mode(PermissionMode::BypassPermissions)
+            .system_prompt(SystemPrompt::Preset {
+                preset: "claude_code".to_string(),
+                append: Some(TAGGER_SYSTEM_PROMPT.to_string()),
+                exclude_dynamic_sections: None,
+            })
+            .build();
 
-    let prompt = format!(
-        "Language: {language}\n\nClassify each test in this file:\n\n```\n{test_file_content}\n```"
-    );
-
-    client.send(&prompt).await?;
-
-    let mut text_blocks = Vec::new();
-
-    {
-        let mut responses = client.receive_response()?;
-        while let Some(message) = responses.next().await {
-            match message? {
-                Message::Assistant(assistant) => {
-                    for block in assistant.content {
-                        if let ContentBlock::Text { text } = block {
-                            text_blocks.push(text);
-                        }
-                    }
-                }
-                Message::Result(_) => break,
-                _ => {}
-            }
-        }
+        let client = ClaudeClient::connect(options).await?;
+        Ok(Self { client, language })
     }
 
-    client.disconnect().await?;
+    pub async fn tag_file(&self, content: &str) -> anyhow::Result<Vec<TagSuggestion>> {
+        let prompt = format!(
+            "Language: {}\n\nClassify each test in this file:\n\n```\n{content}\n```",
+            self.language
+        );
 
-    let full_text = text_blocks.join("\n");
-    parse_suggestions(&full_text)
+        self.client.send(&prompt).await?;
+
+        let mut text_blocks = Vec::new();
+
+        {
+            let mut responses = self.client.receive_response()?;
+            while let Some(message) = responses.next().await {
+                match message? {
+                    Message::Assistant(assistant) => {
+                        for block in assistant.content {
+                            if let ContentBlock::Text { text } = block {
+                                text_blocks.push(text);
+                            }
+                        }
+                    }
+                    Message::Result(_) => break,
+                    _ => {}
+                }
+            }
+        }
+
+        let full_text = text_blocks.join("\n");
+        parse_suggestions(&full_text)
+    }
+
+    pub async fn disconnect(mut self) -> anyhow::Result<()> {
+        self.client.disconnect().await?;
+        Ok(())
+    }
 }
 
 fn parse_suggestions(text: &str) -> anyhow::Result<Vec<TagSuggestion>> {
     let trimmed = text.trim();
 
-    // Try direct parse first
     if let Ok(suggestions) = serde_json::from_str::<Vec<TagSuggestion>>(trimmed) {
         return Ok(suggestions);
     }
 
-    // Extract JSON array from markdown code block
     let json_start = trimmed.find('[');
     let json_end = trimmed.rfind(']');
 

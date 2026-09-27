@@ -75,6 +75,14 @@ pub async fn run(
     let primary_lang = languages[0];
     let mut all_suggestions: Vec<FileSuggestions> = Vec::new();
 
+    let session = match agent::TaggerSession::connect(primary_lang).await {
+        Ok(s) => s,
+        Err(e) => {
+            display::print_error(&format!("failed to start agent session: {e}"));
+            std::process::exit(1);
+        }
+    };
+
     for (file_path, _file_tests) in &files_map {
         let Ok(content) = std::fs::read_to_string(file_path) else {
             display::print_warning(&format!("cannot read {file_path}, skipping"));
@@ -83,7 +91,7 @@ pub async fn run(
 
         println!("  {} {}", "⠋".cyan(), shorten(file_path, &root));
 
-        match agent::tag_session(&content, primary_lang).await {
+        match session.tag_file(&content).await {
             Ok(suggestions) => {
                 all_suggestions.push(FileSuggestions {
                     file: shorten(file_path, &root),
@@ -94,6 +102,10 @@ pub async fn run(
                 display::print_error(&format!("agent failed on {}: {e}", shorten(file_path, &root)));
             }
         }
+    }
+
+    if let Err(e) = session.disconnect().await {
+        display::print_warning(&format!("session disconnect: {e}"));
     }
 
     match format {
