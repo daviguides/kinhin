@@ -5,6 +5,7 @@ mod audit;
 mod census;
 mod detect;
 mod display;
+mod gate;
 mod run;
 mod tags;
 
@@ -74,7 +75,23 @@ enum Commands {
     },
 
     /// Run mutation parity gate (K₁ ⊇ K₀)
-    Gate,
+    Gate {
+        /// Language override (auto-detects if omitted)
+        #[arg(long, value_enum)]
+        lang: Option<detect::Language>,
+
+        /// Path to baseline file (K₀) for comparison
+        #[arg(long)]
+        baseline: Option<String>,
+
+        /// Save current results as baseline (K₀) to this path
+        #[arg(long)]
+        save_baseline: Option<String>,
+
+        /// Directory to run in (defaults to current directory)
+        #[arg(long, default_value = ".")]
+        path: String,
+    },
 
     /// Auto-tag tests via AI agent session
     Tag,
@@ -108,9 +125,14 @@ fn main() {
         Commands::Run { mode, lang, ts_runner, ref path, ref extra } => {
             run::run(mode, lang, ts_runner, path, extra);
         }
-        Commands::Gate => {
-            eprintln!("kinhin gate: not yet implemented (Phase 7c)");
-            std::process::exit(1);
+        Commands::Gate { lang, ref baseline, ref save_baseline, ref path } => {
+            gate::run(
+                path,
+                lang,
+                baseline.as_deref(),
+                save_baseline.as_deref(),
+                cli.output,
+            );
         }
         Commands::Tag => {
             eprintln!("kinhin tag: not yet implemented (Phase 7d)");
