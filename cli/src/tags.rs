@@ -55,6 +55,10 @@ const SKIP_DIRS: &[&str] = &[
     "dist",
     "build",
     ".claude",
+    ".kinhin",
+    "mutants",
+    ".mutmut-cache",
+    ".stryker-tmp",
 ];
 
 fn should_skip(entry: &walkdir::DirEntry) -> bool {
