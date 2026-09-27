@@ -125,6 +125,8 @@ pub async fn run(
                 None
             }
         };
+        // Shadow with mutable binding for tag_file calls
+        let mut session = session;
 
         // Group by file
         let mut file_groups: BTreeMap<String, Vec<&TaggedTest>> = BTreeMap::new();
@@ -133,7 +135,7 @@ pub async fn run(
             file_groups.entry(key).or_default().push(test);
         }
 
-        if let Some(session) = session {
+        if let Some(ref mut session) = session {
             for (file_path, _) in &file_groups {
                 let Ok(content) = std::fs::read_to_string(file_path) else {
                     continue;
@@ -153,9 +155,20 @@ pub async fn run(
                     }
                 }
             }
+        }
 
-            if let Err(e) = session.disconnect().await {
-                display::print_warning(&format!("session disconnect: {e}"));
+        if let Some(session) = session {
+            match session.disconnect().await {
+                Ok(metrics) => {
+                    println!(
+                        "\n  {} files: {}  turns: {}  cost: ${:.4}",
+                        "⧗".dimmed(),
+                        metrics.files_processed,
+                        metrics.total_turns,
+                        metrics.total_cost_usd,
+                    );
+                }
+                Err(e) => display::print_warning(&format!("session disconnect: {e}")),
             }
         }
     }

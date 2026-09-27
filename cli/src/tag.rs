@@ -75,7 +75,7 @@ pub async fn run(
     let primary_lang = languages[0];
     let mut all_suggestions: Vec<FileSuggestions> = Vec::new();
 
-    let session = match agent::TaggerSession::connect(primary_lang).await {
+    let mut session = match agent::TaggerSession::connect(primary_lang).await {
         Ok(s) => s,
         Err(e) => {
             display::print_error(&format!("failed to start agent session: {e}"));
@@ -104,8 +104,17 @@ pub async fn run(
         }
     }
 
-    if let Err(e) = session.disconnect().await {
-        display::print_warning(&format!("session disconnect: {e}"));
+    match session.disconnect().await {
+        Ok(metrics) => {
+            println!(
+                "\n  {} files: {}  turns: {}  cost: ${:.4}",
+                "⧗".dimmed(),
+                metrics.files_processed,
+                metrics.total_turns,
+                metrics.total_cost_usd,
+            );
+        }
+        Err(e) => display::print_warning(&format!("session disconnect: {e}")),
     }
 
     match format {
