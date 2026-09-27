@@ -4,7 +4,7 @@
 
 **Kinhin** (経行 / 禅歩) is the practice of walking meditation in Zen Buddhism, serving as active transition between periods of zazen (seated meditation).
 
-**Philosophy**: Like walking meditation with deliberate steps, Kinhin guides developers through TDD with mindful progression - red, green, refactor.
+**Philosophy**: Like walking meditation with deliberate steps, Kinhin guides developers through TDD with mindful progression - red, green, refactor, prune.
 
 
 ## Structure
@@ -16,10 +16,11 @@ kinhin/
 │   │   ├── tdd/              # TDD methodology (universal)
 │   │   ├── python-tdd/       # Python-specific TDD
 │   │   ├── rust-tdd/         # Rust-specific TDD (methodological deltas)
-│   │   └── java-tdd/         # Java-specific TDD (methodological deltas)
+│   │   ├── java-tdd/         # Java-specific TDD (methodological deltas)
+│   │   └── typescript-tdd/   # TypeScript-specific TDD (methodological deltas)
 │   ├── context/
-│   │   ├── guides/           # TDD workflow guides (universal)
-│   │   ├── examples/         # Test templates (Python) + rust/java-tdd-patterns.md
+│   │   ├── guides/           # TDD workflow guides + prune guide + runner guide
+│   │   ├── examples/         # Test templates (Python) + per-language patterns + lifecycle tags + anti-patterns
 │   │   └── checklists/       # TDD checklists (universal)
 │   └── prompts/
 ├── commands/
@@ -31,14 +32,27 @@ kinhin/
 
 | Command | Purpose |
 |---------|---------|
-| `/kinhin:load [python\|rust\|java\|all]` | Load TDD principles — universal core + language specifics |
+| `/kinhin:load [python\|rust\|java\|typescript\|all]` | Load TDD principles — universal core + language specifics |
+| `/kinhin:prune` | Run the prune pass on the current branch's test files |
 
 **Language resolution**: explicit argument wins; without argument,
 detect markers (`pyproject.toml` → python, `Cargo.toml` → rust,
-`pom.xml`/`build.gradle`/`build.gradle.kts` → java) in cwd,
+`pom.xml`/`build.gradle`/`build.gradle.kts` → java,
+`tsconfig.json` → typescript) in cwd,
 ancestors, and shallow subdirectories, loading the UNION
 (monorepos load multiple). Nothing detected → python fallback.
-Universal files (methodology, guides, checklist) load ALWAYS.
+Universal files (methodology, guides, checklist, prune guide,
+runner guide, lifecycle tags) load ALWAYS.
+
+**4-phase TDD cycle**: Red → Green → Refactor → **Prune**. Every
+test is born with a lifecycle tag (`@scaffold` by default). The
+burden of proof is on keeping a test. Scaffolds die at prune;
+permanent tests (`@decision`, `@contract`, `@incident`) carry a
+ref pointing to their authority source.
+
+**Runner contract**: no bail, parallel by default, randomized order,
+three-way flaky classification, changed-set selection in inner loop,
+structured output. Language-specific configs in each delta spec.
 
 **Rust TDD** is not translated Python TDD — the spec covers the
 methodological deltas: the compiler eliminates a class of tests
@@ -55,6 +69,11 @@ mocking requires interface seams decided in the RED phase, and
 ArchUnit turns layer rules into tests. Tooling (JUnit 6, AssertJ,
 Mockito, Testcontainers, ArchUnit, JaCoCo) lives in shodo's
 `java-testing-tools-spec.md`.
+
+**TypeScript TDD**: types are erased and unsound — the central
+difference from Rust and Java. RED includes type errors (`tsc
+--noEmit` is step 1). Do not test what strict TS proves. Module
+mocks are scaffold smell. Snapshot tests default to `@scaffold`.
 
 
 ## Related Plugins
