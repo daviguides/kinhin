@@ -4,7 +4,7 @@ use crate::display;
 use crate::tags::{LifecycleTag, TaggedTest};
 use crate::OutputFormat;
 
-#[derive(Debug, Default, serde::Serialize)]
+#[derive(Debug, Default, Clone, serde::Serialize)]
 pub struct Census {
     pub total: usize,
     pub scaffold: usize,

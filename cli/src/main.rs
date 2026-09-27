@@ -1,12 +1,15 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use tracing_subscriber::EnvFilter;
 
+mod agent;
 mod audit;
 mod census;
 mod detect;
 mod display;
 mod gate;
+mod prune;
 mod run;
+mod tag;
 mod tags;
 
 #[derive(Copy, Clone, PartialEq, Eq, ValueEnum)]
@@ -94,10 +97,38 @@ enum Commands {
     },
 
     /// Auto-tag tests via AI agent session
-    Tag,
+    Tag {
+        /// Language override (auto-detects if omitted)
+        #[arg(long, value_enum)]
+        lang: Option<detect::Language>,
+
+        /// Apply suggested tags to files (default: dry run)
+        #[arg(long)]
+        apply: bool,
+
+        /// Directory to scan (defaults to current directory)
+        #[arg(long, default_value = ".")]
+        path: String,
+    },
 
     /// Prune construction tests: census → classify → collapse → verify
-    Prune,
+    Prune {
+        /// Language override (auto-detects if omitted)
+        #[arg(long, value_enum)]
+        lang: Option<detect::Language>,
+
+        /// Apply deletions (default: dry run showing the plan)
+        #[arg(long)]
+        apply: bool,
+
+        /// Run mutation parity gate after pruning
+        #[arg(long)]
+        verify: bool,
+
+        /// Directory to scan (defaults to current directory)
+        #[arg(long, default_value = ".")]
+        path: String,
+    },
 }
 
 fn main() {
@@ -122,25 +153,39 @@ fn main() {
             let census = census::Census::from_tests(&tests);
             census.display(cli.output);
         }
-        Commands::Run { mode, lang, ts_runner, ref path, ref extra } => {
+        Commands::Run {
+            mode,
+            lang,
+            ts_runner,
+            ref path,
+            ref extra,
+        } => {
             run::run(mode, lang, ts_runner, path, extra);
         }
-        Commands::Gate { lang, ref baseline, ref save_baseline, ref path } => {
-            gate::run(
-                path,
-                lang,
-                baseline.as_deref(),
-                save_baseline.as_deref(),
-                cli.output,
-            );
+        Commands::Gate {
+            lang,
+            ref baseline,
+            ref save_baseline,
+            ref path,
+        } => {
+            gate::run(path, lang, baseline.as_deref(), save_baseline.as_deref(), cli.output);
         }
-        Commands::Tag => {
-            eprintln!("kinhin tag: not yet implemented (Phase 7d)");
-            std::process::exit(1);
+        Commands::Tag {
+            lang,
+            apply,
+            ref path,
+        } => {
+            let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+            rt.block_on(tag::run(path, lang, apply, cli.output));
         }
-        Commands::Prune => {
-            eprintln!("kinhin prune: not yet implemented (Phase 7e)");
-            std::process::exit(1);
+        Commands::Prune {
+            lang,
+            apply,
+            verify,
+            ref path,
+        } => {
+            let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+            rt.block_on(prune::run(path, lang, apply, verify, cli.output));
         }
     }
 }
