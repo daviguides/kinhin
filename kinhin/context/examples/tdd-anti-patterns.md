@@ -518,6 +518,278 @@ def test_discount_never_exceeds_amount(amount: Decimal):
     assert result <= amount
 ```
 
+## Lifecycle Anti-Patterns
+
+### Anti-Pattern 16: Immortal Scaffolding
+
+**Problem**: Characterization or construction tests outliving the work they guided.
+
+**Why It's Bad**:
+- Suite grows monotonically
+- Scaffold tests assert implementation shape, not behavior
+- Refactoring breaks them, assistant burns time fixing tests instead of the feature
+- False confidence from high test count
+
+**Bad Example**:
+```python
+# Written during refactoring as characterization — never removed
+def test_legacy_format_output():
+    """Characterization: captures current output shape."""
+    result = format_report(data)
+    assert result == "Header: Test\nBody: content\nFooter: v2"
+```
+
+**Good Example**:
+```python
+# Characterization test tagged and pruned after refactoring
+@pytest.mark.scaffold  # Dies at prune
+def test_legacy_format_output():
+    """Characterization: captures current output during refactor."""
+    result = format_report(data)
+    assert result == "Header: Test\nBody: content\nFooter: v2"
+
+# After refactoring, scaffold deleted. Surviving decision test:
+@pytest.mark.decision(reason="Report must include version in footer")
+def test_report_footer_contains_version():
+    result = format_report(data)
+    assert "v2" in result.split("\n")[-1]
+```
+
+### Anti-Pattern 17: Mechanism Assertions
+
+**Problem**: Asserting call counts, call order, or argument matching instead of observable behavior.
+
+**Why It's Bad**:
+- Tests the wiring, not the outcome
+- Every refactoring breaks them even when behavior is unchanged
+- Distinct from Over-Mocking (#13): this is about what you ASSERT, not what you SET UP
+- Prime candidates for pruning — they encode no decision
+
+**Bad Example**:
+```python
+def test_process_order(mocker):
+    mock_db = mocker.patch("module.save_order")
+    mock_email = mocker.patch("module.send_email")
+
+    process_order(order)
+
+    # Mechanism assertions — testing HOW, not WHAT
+    assert mock_db.call_count == 1
+    assert mock_db.call_args[0][0].status == "confirmed"
+    mock_email.assert_called_once_with(
+        to="user@example.com",
+        subject="Order Confirmed"
+    )
+```
+
+**Good Example**:
+```python
+def test_process_order_confirms_and_notifies():
+    """Test observable outcome: order is confirmed and user is notified."""
+    result = process_order(valid_order)
+
+    # Behavior assertions — testing WHAT happened
+    assert result.status == OrderStatus.CONFIRMED
+    assert result.total == calculate_expected_total(valid_order)
+
+    saved = get_order(result.id)
+    assert saved.status == OrderStatus.CONFIRMED
+
+    notifications = get_pending_notifications(result.user_id)
+    assert any(n.type == "order_confirmed" for n in notifications)
+```
+
+### Anti-Pattern 18: Coverage as Retention Metric
+
+**Problem**: Using branch or line coverage to decide which tests to keep after pruning.
+
+**Why It's Bad**:
+- Coverage rewards keeping shape-tests that touch trivial branches
+- A test asserting `mock.call_count == 1` covers the call site — 100% branch, 0% verification
+- Coverage measures what was EXECUTED, not what was VERIFIED
+- Actively opposes pruning: removing scaffold drops coverage, triggering "add tests back"
+
+**Bad Example**:
+```
+# Post-prune review
+"Coverage dropped from 94% to 87% after pruning scaffolds.
+ Restoring 12 mock-assertion tests to meet the 90% gate."
+```
+
+**Good Example**:
+```
+# Post-prune review
+"Mutation parity: K₁ ⊇ K₀ — all mutants killed pre-prune are still killed.
+ Branch coverage dropped from 94% to 87% (expected, scaffold removal).
+ No load-bearing verification lost."
+```
+
+### Anti-Pattern 19: Mirror Test
+
+**Problem**: Editing a permanent test's assertion to match changed code instead of fixing the code.
+
+**Why It's Bad**:
+- The permanent test (`@decision`, `@contract`, `@incident`) carries authority
+- Changing its assertion to match new output strips that authority silently
+- Worse than deleting: the test keeps its badge while carrying no verification
+- The original decision may still be correct — the code may be the bug
+
+**Bad Example**:
+```python
+# Original @decision test
+@pytest.mark.decision(reason="Discount never exceeds 50%")
+def test_discount_cap():
+    result = calculate_discount(premium_user, Decimal("1000"))
+    assert result <= Decimal("500")  # 50% cap
+
+# After code change, developer "fixes" the test:
+@pytest.mark.decision(reason="Discount never exceeds 50%")
+def test_discount_cap():
+    result = calculate_discount(premium_user, Decimal("1000"))
+    assert result <= Decimal("600")  # "Fixed" to match new behavior
+    # ⚠️ The reason still says 50% but the assertion says 60%
+```
+
+**Good Example**:
+```python
+# Test fails → test is the spec → fix the CODE
+def calculate_discount(user, amount):
+    MAX_DISCOUNT_RATE = Decimal("0.50")  # Fix: restore the 50% cap
+    # ...
+
+# OR: the decision genuinely changed (confirmed by authority)
+@pytest.mark.decision(reason="Discount cap raised to 60% per PROJ-456")
+def test_discount_cap():
+    result = calculate_discount(premium_user, Decimal("1000"))
+    assert result <= Decimal("600")  # Updated with new ref
+```
+
+## Runner Anti-Patterns
+
+### Anti-Pattern 20: Bail on First Failure
+
+**Problem**: Using `-x` / `--bail` / `--maxfail=1` during the fix loop.
+
+**Why It's Bad**:
+- Code assistants process in batch — seeing ALL failures at once is dramatically more efficient
+- Serial fix→run→fail→fix cycle wastes time re-running the entire suite for each failure
+- Hides the true scope of breakage: 1 visible failure may mask 40 related ones
+- Prevents cause clustering (grouping failures by root cause)
+
+**Bad Example**:
+```bash
+pytest -x  # Stops at first failure
+jest --bail  # Same problem
+```
+
+**Good Example**:
+```bash
+pytest --maxfail=0 -n auto -p randomly  # All failures, parallel, randomized
+jest --no-bail --maxWorkers=50%  # Same approach
+```
+
+### Anti-Pattern 21: Order-Dependent Tests
+
+**Problem**: Tests that pass in a fixed sequence but fail when randomized.
+
+**Why It's Bad**:
+- Indicates shared state between tests (global variables, database rows, file system)
+- Parallelization is impossible without isolation
+- A passing suite gives false confidence — the tests verify order, not behavior
+- Flaky failures when CI randomizes or parallelizes
+
+**Bad Example**:
+```python
+# test_a creates a user
+def test_create_user():
+    create_user({"name": "Test"})
+
+# test_b assumes test_a ran first
+def test_get_user():
+    user = get_user_by_name("Test")  # Fails if test_a didn't run
+    assert user.name == "Test"
+```
+
+**Good Example**:
+```python
+# Each test creates its own state
+def test_create_user():
+    user = create_user({"name": "Test"})
+    assert user.id is not None
+
+def test_get_user():
+    created = create_user({"name": "Test"})  # Own setup
+    user = get_user(created.id)
+    assert user.name == "Test"
+```
+
+### Anti-Pattern 22: Retry Until Green
+
+**Problem**: Automatically retrying failed tests until they pass, masking flakiness.
+
+**Why It's Bad**:
+- Hides the exact information the assistant needs to fix the test
+- A test that passes on retry 3 has a real bug — shared state, timing, or external dependency
+- Retry-until-green in CI means the suite lies about its own health
+- The assistant, seeing green, moves on — the flake recurs on the next run
+
+**Bad Example**:
+```toml
+# pytest-rerunfailures configured globally
+[tool.pytest.ini_options]
+reruns = 3
+reruns_delay = 1
+```
+
+**Good Example**:
+```bash
+# Three-run flake protocol:
+# 1. Test fails in full run
+# 2. Rerun isolated in fresh process (×3)
+#    - Still fails → deterministic-fail (real bug)
+#    - Passes isolated → rerun in original order with original seed
+#      - Fails → isolation-dependent (shared state bug)
+#      - Passes → flaky (timing/external, quarantine with ticket)
+```
+
+### Anti-Pattern 23: Diff-String Debugging
+
+**Problem**: Assistant parsing pretty-printed diffs with ANSI color codes to understand test failures.
+
+**Why It's Bad**:
+- ANSI codes consume tokens for zero semantic value
+- Pretty-printed diffs are formatted for human readability, not machine parsing
+- The assistant re-derives the delta from a visual representation instead of working with data
+- Large diffs overflow context and obscure the actual mismatch
+
+**Bad Example**:
+```
+# Default jest output — tokens spent on formatting
+Expected: {"name": "Test", "email": "test@example.com", "role": "admin"}
+Received: {"name": "Test", "email": "test@example.com", "role": "user"}
+
+- Expected  - 1
++ Received  + 1
+
+  Object {
+    "email": "test@example.com",
+    "name": "Test",
+-   "role": "admin",
++   "role": "user",
+  }
+```
+
+**Good Example**:
+```bash
+# Structured JSON output — assertion operands as data
+jest --json --outputFile=results.json
+# or
+vitest --reporter=json
+
+# The assistant reads: expected="admin", actual="user", field="role"
+# No parsing, no ANSI, no token waste
+```
+
 ## Detection Checklist
 
 Use this checklist to detect anti-patterns in your tests:
@@ -537,9 +809,20 @@ Use this checklist to detect anti-patterns in your tests:
 - [ ] Is mocking minimal (only external dependencies)?
 - [ ] Is context preserved across related tests?
 - [ ] Are property-based tests used for invariants?
+- [ ] Are all tests tagged at birth?
+- [ ] Are scaffold/characterization tests pruned before PR?
+- [ ] Are permanent tests asserting behavior, not mechanism?
+- [ ] Is mutation parity used for retention (not coverage)?
+- [ ] Are permanent tests treated as spec (not edited to match code)?
+- [ ] Is the runner configured with no-bail?
+- [ ] Do tests pass in randomized order?
+- [ ] Are flaky tests classified (not retried into silence)?
+- [ ] Is the assistant reading structured output (not ANSI diffs)?
 
 ## References
 
 - TDD Spec: `@~/.claude/kinhin/spec/tdd/tdd-spec.md`
 - Implementation Guide: `@~/.claude/kinhin/context/guides/tdd-implementation-guide.md`
 - Test Templates: `@~/.claude/kinhin/context/examples/tdd-unit-tests.md`
+- Prune Guide: `@~/.claude/kinhin/context/guides/tdd-prune-guide.md`
+- Runner Guide: `@~/.claude/kinhin/context/guides/tdd-runner-guide.md`
