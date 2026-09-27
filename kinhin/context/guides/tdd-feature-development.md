@@ -140,6 +140,21 @@ Generate implementations for phase [N] ensuring all related tests pass.
 - [ ] No untested edge cases
 - [ ] All constraints validated
 
+### Phase 6: Prune
+
+**Objective**: Remove construction-time tests, keep only what protects against future regression.
+
+**Steps:**
+1. **Tag census**: Every test should already be tagged from Phases 2–4. List tests by tag.
+2. **Collapse scaffolds**: Where multiple `@scaffold` tests cover the same function, collapse into one table-driven `@decision` test with representative inputs per equivalence class + boundaries.
+3. **Delete remaining scaffolds**: Tests that are subsets of surviving tests, assert implementation shape, or have no stated authority — delete.
+4. **Mutation parity**: Run mutation testing on changed files. K₁ (post-prune killed set) ⊇ K₀ (pre-prune killed set). Any escaping mutant means something load-bearing was pruned — restore or write the decision test it implies.
+5. **PR census line**: `written N / pruned M / survivors: X decision, Y contract, Z incident`.
+
+**Prune is a separate commit** from the feature implementation.
+
+---
+
 ## Feature Complexity Handling
 
 ### Simple Features (1-3 components)
@@ -271,7 +286,10 @@ Feature development is complete when:
 - [ ] Scenario matrix complete
 - [ ] All test files created and passing
 - [ ] All components implemented
-- [ ] Code coverage ≥ 90%
+- [ ] Code coverage ≥ 90% (at GREEN, construction-time)
+- [ ] Prune pass complete: scaffolds collapsed or deleted, every survivor tagged with reason
+- [ ] Mutation parity verified (K₁ ⊇ K₀)
+- [ ] PR census line: `written N / pruned M / survivors: X decision, Y contract, Z incident`
 - [ ] Performance requirements met
 - [ ] Security validations pass
 - [ ] Integration tests pass
