@@ -82,6 +82,16 @@ Generate all implementations in this category simultaneously.
 Ensure all tests pass before moving to next category.
 ```
 
+#### Step 4: Prune
+
+**Tag census**: Review all tests by tag. Every `@scaffold` test is a candidate for deletion or collapse.
+
+**Collapse**: Where multiple scaffold tests cover the same function, merge into one table-driven `@decision` test with representative inputs per equivalence class + boundaries.
+
+**Mutation parity**: Run mutation testing on changed files. K₁ ⊇ K₀. Any escaping mutant → restore or write the decision test it implies.
+
+**PR census line**: `written N / pruned M / survivors: X decision, Y contract, Z incident`.
+
 ---
 
 ### Workflow 2: Scenario Matrix Approach
@@ -174,6 +184,14 @@ Implement with these constraints:
 
 Generate complete implementation satisfying all matrix cells.
 ```
+
+#### Step 4: Prune
+
+**The matrix is the permanent artifact, not the tests.** The scenario matrix persists as a document (PR description or design doc). The tests are table-driven survivors.
+
+**Collapse**: N matrix rows over one function → one parametrized `@decision` test with one row per equivalence class + boundaries.
+
+**Mutation parity**: K₁ ⊇ K₀. PR census line.
 
 ---
 
@@ -278,6 +296,14 @@ Implement in dependency order:
 Generate all implementations simultaneously.
 Ensure all tests pass before completion.
 ```
+
+#### Step 4: Prune
+
+**Tag census**: Review all tests. Tag at birth should have been applied during Step 2. Any untagged test is `@scaffold` by default.
+
+**Collapse and graduate**: Scaffold tests that encode a real decision → `@decision(ref=)`. Tests covering system boundaries → `@contract(ref=)`. The rest → delete or collapse into table-driven survivors.
+
+**Mutation parity**: K₁ ⊇ K₀. PR census line.
 
 ---
 
@@ -536,6 +562,25 @@ class Test[ComponentName](BaseTestCase):
 Generate complete test class using base utilities.
 ```
 
+### Runner Feedback Loop
+
+Three run modes to minimize fix-run-fix cycle time:
+
+**Loop mode** (inner development loop):
+- Run only tests whose import graph touches the changed files (changed-set selection).
+- Parallel execution, randomized order, no bail.
+- Fix one cause cluster at a time, rerun affected tests only.
+
+**Full mode** (before PR):
+- Run the entire test suite.
+- Validates that changed-set selection didn't miss a cross-module regression.
+
+**Diagnostic mode** (isolate a flake):
+- Serial execution, fixed order, only the failing test.
+- Used exclusively to determine whether a failure is deterministic, isolation-dependent, or flaky.
+
+Reference: `@~/.claude/kinhin/context/guides/tdd-runner-guide.md`
+
 ---
 
 ## Workflow Selection Guide
@@ -590,10 +635,14 @@ Generate complete implementation using hybrid approach.
 - AAA pattern (Arrange-Act-Assert)
 - Clear assertion messages
 - Property-based tests for constraints
+- Tags at birth on every test (`@scaffold` is the default)
+- Prune phase before PR
 
 ### Always Avoid
 - Sequential test generation (use batch instead)
 - Implicit assumptions in tests
+- `-x` / `--bail` during batch fix loops (see Runner Contract)
+- Retry-until-green to hide flakiness
 - Magic values without explanation
 - Incomplete scenario coverage
 - Tests without clear purpose
