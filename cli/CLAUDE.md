@@ -2,79 +2,71 @@
 
 ## Overview
 
-Rust CLI companion to the Kinhin TDD plugin. Automates lifecycle management: auditing tags, running tests with the Runner Contract, mutation gating, auto-tagging via AI, and pruning construction tests.
+Rust CLI companion to the Kinhin TDD plugin. The plugin specs (`../kinhin/spec/`) define the lifecycle; this crate executes it. A behaviour change starts in the spec, then lands here. User-facing behaviour, flags and exit codes: `README.md`.
 
 ## Commands
 
 ```bash
-cargo build --release              # Build
-cargo install --path .             # Install to ~/.cargo/bin/
-cargo test                         # Run tests (when they exist)
-cp target/release/kinhin ~/.cargo/bin/  # Manual install (if crates.io DNS fails)
+cargo test                               # must pass, zero warnings
+cargo build --release
+cp target/release/kinhin ~/.cargo/bin/   # install without touching crates.io
 ```
+
+## Definition of done for any change here
+
+"It compiles" is not evidence. A command is done when it has been run against a real project and its full output read.
+
+- Keep a private copy of a real Python project as fixture; never test in a worktree someone is using.
+- After a change to `tag`, `prune` or `gate`: run the command, then `pytest --collect-only`, `kinhin census`, and the project's linter.
+- Parsers of tool output are written from captured output, saved under `tests/fixtures/`, never from memory.
+- A tool that fails must make the command fail. No result may be reported from an empty or errored run.
+- A flag changed here is changed in `README.md` in the same commit.
 
 ## Architecture
 
 ```
 src/
-├── main.rs       # clap entry point, subcommand dispatch
-├── audit.rs      # kinhin audit — tag census + ref validation
-├── census.rs     # kinhin census — tag count display
-├── run.rs        # kinhin run — wraps runner with Runner Contract flags
-├── setup.rs      # kinhin setup — check/install runner deps
-├── gate.rs       # kinhin gate — mutation parity (K₁ ⊇ K₀)
-├── tag.rs        # kinhin tag — auto-classify via agent session
-├── prune.rs      # kinhin prune — full prune pipeline
-├── agent.rs      # TaggerSession — claude-agent-toolkit wrapper
-├── detect.rs     # language detection by project markers
-├── tags.rs       # tag parser per language (pytest marks, mod scaffold, @Tag, file suffix)
-├── display.rs    # comfy-table styled output, icons, colors
-└── Cargo.toml
+├── main.rs       clap surface and dispatch; each command returns its exit code
+├── env.rs        how to launch project tooling (uv run / .venv / PATH), ts package runner
+├── detect.rs     language detection by project markers
+├── tags.rs       scan test files, read lifecycle tags (Python via pytests.rs; Rust, Java, TS)
+├── pytests.rs    Python test-file surgery: locate tests, read/insert markers, delete tests
+├── pyproject.rs  additive pyproject.toml edits (pytest markers, [tool.mutmut]) via toml_edit
+├── pycheck.rs    pytest --collect-only gate, best-effort ruff fix
+├── census.rs     counts by tag
+├── audit.rs      per-test report, ref classification
+├── run.rs        Runner Contract command per language; pytest args are a pure function
+├── setup.rs      dependency/config check, uv install
+├── gate.rs       mutmut run, result parsing, killed-set parity
+├── agent.rs      TaggerSession over claude-agent-toolkit, NDJSON event log
+├── tag.rs        tag flow: cache, session, apply, verify, rollback
+├── prune.rs      plan, delete, verify with gate, restore load-bearing, rollback
+└── display.rs    tables; warnings/errors/progress go to stderr
 ```
 
-## Two modes
+## Invariants
 
-**Deterministic** (no LLM): `audit`, `census`, `run`, `setup`, `gate`
-**Agent session** (claude-agent-toolkit): `tag`, `prune`
+- **Fail closed.** `gate` exits 2 when mutmut fails, generates no mutants or checks none; `tag` and `prune` restore every file when the suite stops collecting or parity is lost.
+- **K is a set.** Parity compares killed mutant ids, never counts. `segfault`/`timeout`/`suspicious` are never killed.
+- **Clean mutation runs.** `gate::run_mutmut` deletes `mutants/` first: old results describe another suite.
+- **macOS:** mutmut is launched with `NO_PROXY=*`. Without it, urllib's proxy lookup segfaults mutmut's forked workers (crash dialogs, flaky statuses).
+- **Destructive commands default to dry run** (`prune`). `tag` applies by default and is safe to repeat.
+- **stdout carries results, stderr carries progress**, so `--output json` is always parseable.
+- **One agent session per run**, one turn per file; never one session per file. The session has no tools and loads no user or project settings.
+- **Python tests are identified as `Class::test`**; bare names collide.
+- **A lifecycle tag is read only from the decorator block directly above the test** (or the contiguous annotation/comment block in Rust, Java, TS). A fixed "N lines above" window leaks tags between tests.
+- **pyproject edits are additive and idempotent**; existing keys are never replaced.
+- **No pip.** Python environments are uv: `uv add --dev`, `uv run`.
+- Language detection must match the plugin's table (`../kinhin/prompts/load.md`).
 
-Agent commands open ONE `ClaudeClient` session, process all files sequentially, then disconnect. Never one session per file.
+## Scope limits (say so, don't fake it)
 
-## Key decisions
-
-- **uv-aware**: Python runner detects `uv.lock` and uses `uv run pytest ...` instead of bare `pytest`
-- **Package manager detection**: TypeScript detects `bun.lockb` (bunx), `pnpm-lock.yaml` (pnpx), fallback `npx`
-- **mutmut v3.8**: config-only API, no `--paths-to-mutate` CLI flag. Config in `[tool.mutmut]` section of `pyproject.toml`
-- **Graceful degradation**: `kinhin run` omits flags for missing pytest plugins and prints what to install
-- **Event logging**: agent sessions write NDJSON to `.kinhin/session-{timestamp}.jsonl`
-- **Tag cache**: `kinhin tag --dry-run` saves to `.kinhin/tag-suggestions.json`, `kinhin tag` reads from cache, `--force` refreshes
-- **Default model**: `haiku` for tagging (cost efficiency). Override with `--model sonnet|opus`
-- **Default apply**: `kinhin tag` applies by default, `--dry-run` is the preview flag
+`tag` apply, `prune --apply` and `gate` are Python-only. Other languages get an explicit error, not a silent no-op. `run` for Rust/Java/TypeScript builds a command that has not been verified on a real project.
 
 ## Dependencies
 
-| Crate | Purpose |
-|---|---|
-| `claude-agent-toolkit` (git) | Agent sessions for tag/prune |
-| `clap` | CLI parsing (derive) |
-| `comfy-table` | Rich terminal tables |
-| `owo-colors` | Terminal colors |
-| `serde` + `serde_json` | Structured I/O |
-| `walkdir` | File tree scanning |
-| `regex` | Tag pattern matching |
-| `chrono` | Timestamps for event log |
-| `tokio` + `futures` | Async runtime for agent sessions |
-| `tempfile` | Sandbox for agent sessions |
-| `anyhow` | Error handling |
+`claude-agent-toolkit` (git, agent session), `clap`, `comfy-table`, `owo-colors`, `serde`/`serde_json`, `toml_edit`, `walkdir`, `regex`, `chrono`, `tokio`/`futures`, `tempfile`, `anyhow`.
 
-## Scanner skip list
+## Release
 
-`tags.rs` skips: `node_modules`, `.venv`, `target`, `.git`, `__pycache__`, `dist`, `build`, `.claude`, `.kinhin`, `mutants`, `.mutmut-cache`, `.stryker-tmp`
-
-## Detection table (must match plugin)
-
-| Marker | Language |
-|---|---|
-| `pyproject.toml` | Python |
-| `Cargo.toml` | Rust |
-| `pom.xml` / `build.gradle` / `build.gradle.kts` | Java |
-| `tsconfig.json` | TypeScript |
+The CLI is versioned in `Cargo.toml`, separately from the plugin (`../.claude-plugin/plugin.json`). Plugin release workflow: `../CLAUDE.md`.
