@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use comfy_table::{Cell, CellAlignment, Color};
 use owo_colors::OwoColorize;
@@ -26,6 +26,7 @@ pub async fn run(
     path: &str,
     lang: Option<Language>,
     apply: bool,
+    model: Option<&str>,
     format: OutputFormat,
 ) {
     let languages = lang
@@ -75,7 +76,7 @@ pub async fn run(
     let primary_lang = languages[0];
     let mut all_suggestions: Vec<FileSuggestions> = Vec::new();
 
-    let mut session = match agent::TaggerSession::connect(primary_lang).await {
+    let mut session = match agent::TaggerSession::connect(primary_lang, model).await {
         Ok(s) => s,
         Err(e) => {
             display::print_error(&format!("failed to start agent session: {e}"));
@@ -122,8 +123,47 @@ pub async fn run(
         OutputFormat::Rich => display_rich(&all_suggestions),
     }
 
+    // Save suggestions for reuse
+    let suggestions_path = Path::new(".kinhin").join("tag-suggestions.json");
+    if let Ok(json) = serde_json::to_string_pretty(&all_suggestions) {
+        let _ = std::fs::create_dir_all(".kinhin");
+        let _ = std::fs::write(&suggestions_path, &json);
+    }
+
     if apply {
-        display::print_warning("--apply: tag insertion not yet implemented in v0.1 — apply manually from the suggestions above");
+        let mut applied = 0;
+        let mut failed = 0;
+
+        for file_sugg in &all_suggestions {
+            let file_path = if Path::new(&file_sugg.file).is_relative() {
+                root.join(&file_sugg.file)
+            } else {
+                PathBuf::from(&file_sugg.file)
+            };
+
+            let Ok(content) = std::fs::read_to_string(&file_path) else {
+                display::print_warning(&format!("cannot read {}, skipping apply", file_sugg.file));
+                failed += 1;
+                continue;
+            };
+
+            let new_content = insert_tags(&content, &file_sugg.suggestions, primary_lang);
+
+            if new_content != content {
+                if let Err(e) = std::fs::write(&file_path, &new_content) {
+                    display::print_error(&format!("write failed {}: {e}", file_sugg.file));
+                    failed += 1;
+                } else {
+                    applied += 1;
+                }
+            }
+        }
+
+        let total_tags: usize = all_suggestions.iter().map(|f| f.suggestions.len()).sum();
+        display::print_success(&format!("{applied} file(s) updated, {total_tags} tag(s) inserted"));
+        if failed > 0 {
+            display::print_warning(&format!("{failed} file(s) failed"));
+        }
     }
 }
 
@@ -194,6 +234,102 @@ fn tag_style(tag: &str) -> (Color, &'static str) {
         "contract" => (Color::Blue, "◆"),
         "incident" => (Color::Red, "⚡"),
         _ => (Color::Yellow, "?"),
+    }
+}
+
+fn insert_tags(content: &str, suggestions: &[TagSuggestion], lang: Language) -> String {
+    let lines: Vec<&str> = content.lines().collect();
+    let mut result: Vec<String> = Vec::with_capacity(lines.len() + suggestions.len());
+    let mut tagged_tests: std::collections::HashMap<&str, &TagSuggestion> =
+        suggestions.iter().map(|s| (s.test.as_str(), s)).collect();
+
+    for line in &lines {
+        // Check if this line defines a test function that we have a suggestion for
+        let test_name = extract_test_name(line, lang);
+        if let Some(name) = test_name {
+            if let Some(suggestion) = tagged_tests.remove(name) {
+                let marker = format_marker(suggestion, lang);
+                if !marker.is_empty() {
+                    // Detect indentation
+                    let indent: String = line.chars().take_while(|c| c.is_whitespace()).collect();
+                    result.push(format!("{indent}{marker}"));
+                }
+            }
+        }
+        result.push(line.to_string());
+    }
+
+    result.join("\n") + if content.ends_with('\n') { "\n" } else { "" }
+}
+
+fn extract_test_name<'a>(line: &'a str, lang: Language) -> Option<&'a str> {
+    let trimmed = line.trim();
+    match lang {
+        Language::Python => {
+            if trimmed.starts_with("def test_") || trimmed.starts_with("async def test_") {
+                let start = trimmed.find("test_")?;
+                let rest = &trimmed[start..];
+                let end = rest.find('(')?;
+                Some(&rest[..end])
+            } else {
+                None
+            }
+        }
+        Language::Rust => {
+            if trimmed.starts_with("fn test_") || trimmed.starts_with("fn ") && trimmed.contains("test") {
+                let start = trimmed.find("fn ")? + 3;
+                let rest = &trimmed[start..];
+                let end = rest.find('(').unwrap_or(rest.len());
+                Some(&rest[..end])
+            } else {
+                None
+            }
+        }
+        Language::Java => {
+            if trimmed.starts_with("void test") || trimmed.starts_with("public void test") {
+                let start = trimmed.find("test")?;
+                let rest = &trimmed[start..];
+                let end = rest.find('(').unwrap_or(rest.len());
+                Some(&rest[..end])
+            } else {
+                None
+            }
+        }
+        Language::TypeScript => {
+            None // TS uses file-suffix convention, not inline markers
+        }
+    }
+}
+
+fn format_marker(suggestion: &TagSuggestion, lang: Language) -> String {
+    let ref_str = suggestion.ref_value.as_deref().unwrap_or("");
+
+    match lang {
+        Language::Python => match suggestion.tag.as_str() {
+            "scaffold" => "@pytest.mark.scaffold".to_string(),
+            "decision" => {
+                let reason = &suggestion.reason;
+                format!("@pytest.mark.decision(reason=\"{reason}\")")
+            }
+            "contract" => format!("@pytest.mark.contract(party=\"{ref_str}\")"),
+            "incident" => format!("@pytest.mark.incident(ref=\"{ref_str}\")"),
+            _ => String::new(),
+        },
+        Language::Rust => match suggestion.tag.as_str() {
+            "scaffold" => String::new(), // Rust uses mod scaffold, handled differently
+            "decision" => format!("// kinhin: decision(ref=\"{ref_str}\")"),
+            "contract" => format!("// kinhin: contract(ref=\"{ref_str}\")"),
+            "incident" => format!("// kinhin: incident(ref=\"{ref_str}\")"),
+            _ => String::new(),
+        },
+        Language::Java => match suggestion.tag.as_str() {
+            "scaffold" => "@Tag(\"scaffold\")".to_string(),
+            "decision" => format!("@Tag(\"decision\") // {}", suggestion.reason),
+            "contract" => format!("@Tag(\"contract\") // {ref_str}"),
+            "incident" => format!("@Tag(\"incident\") // {ref_str}"),
+            _ => String::new(),
+        },
+        Language::TypeScript => String::new(), // TS uses file-suffix convention
     }
 }
 

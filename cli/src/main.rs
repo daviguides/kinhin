@@ -106,9 +106,13 @@ enum Commands {
         #[arg(long, value_enum)]
         lang: Option<detect::Language>,
 
-        /// Apply suggested tags to files (default: dry run)
+        /// Preview suggestions without applying (default: apply)
         #[arg(long)]
-        apply: bool,
+        dry_run: bool,
+
+        /// Model to use for tagging (default: haiku for cost efficiency)
+        #[arg(long, default_value = "haiku")]
+        model: String,
 
         /// Directory to scan (defaults to current directory)
         #[arg(long, default_value = ".")]
@@ -199,11 +203,12 @@ fn main() {
         }
         Commands::Tag {
             lang,
-            apply,
+            dry_run,
+            ref model,
             ref path,
         } => {
             let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
-            rt.block_on(tag::run(path, lang, apply, cli.output));
+            rt.block_on(tag::run(path, lang, !dry_run, Some(model), cli.output));
         }
         Commands::Prune {
             lang,

@@ -118,7 +118,7 @@ pub async fn run(
 
         let primary_lang = languages[0];
 
-        let session = match agent::TaggerSession::connect(primary_lang).await {
+        let session = match agent::TaggerSession::connect(primary_lang, Some("haiku")).await {
             Ok(s) => Some(s),
             Err(e) => {
                 display::print_warning(&format!("agent session failed: {e}, treating untagged as scaffold"));

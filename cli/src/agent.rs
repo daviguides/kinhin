@@ -65,18 +65,23 @@ pub struct TaggerSession {
 }
 
 impl TaggerSession {
-    pub async fn connect(language: Language) -> anyhow::Result<Self> {
+    pub async fn connect(language: Language, model: Option<&str>) -> anyhow::Result<Self> {
         let sandbox = tempfile::tempdir()?;
 
-        let options = ClaudeAgentOptions::builder()
+        let mut builder = ClaudeAgentOptions::builder()
             .cwd(sandbox.path())
             .permission_mode(PermissionMode::BypassPermissions)
             .system_prompt(SystemPrompt::Preset {
                 preset: "claude_code".to_string(),
                 append: Some(TAGGER_SYSTEM_PROMPT.to_string()),
                 exclude_dynamic_sections: None,
-            })
-            .build();
+            });
+
+        if let Some(m) = model {
+            builder = builder.model(m);
+        }
+
+        let options = builder.build();
 
         let client = ClaudeClient::connect(options).await?;
 
