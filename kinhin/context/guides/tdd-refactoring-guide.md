@@ -46,6 +46,8 @@ Provide assessment before proceeding with refactoring.
 
 **Objective**: Fill any gaps in test coverage before refactoring.
 
+**Lifecycle Tag**: Tests born in this phase are `@scaffold` by default. They exist to establish a safety net for the refactoring, not as permanent regression tests. Tag at birth.
+
 **Coverage Requirements:**
 - 100% of code being refactored must be tested
 - All branches covered
@@ -74,6 +76,8 @@ Ensure all tests pass before proceeding with refactoring.
 ### Phase 3: Behavior Preservation Tests
 
 **Objective**: Create tests that explicitly validate current behavior.
+
+**Lifecycle Tag**: Tests born in this phase are `@characterization` — golden-master snapshots of current behavior that exist solely to detect unintended changes during the refactoring. They are temporary by design and must be graduated or deleted in the Prune phase.
 
 **Types of Behavior Tests:**
 - **Input/Output Tests**: Validate outputs for all input scenarios
@@ -217,6 +221,24 @@ Run validation:
 Provide validation report.
 If any validation fails, identify and fix issue.
 ```
+
+### Phase 6: Prune
+
+**Objective**: Remove construction-time tests that served their purpose, keep only what protects against future regression.
+
+**Steps:**
+1. **Tag census**: List all tests by tag. Every `@scaffold` and `@characterization` test is a candidate for deletion.
+2. **Graduate or delete**: For each characterization test, decide:
+   - Does it encode a non-obvious decision about behavior? → Graduate to `@decision(ref=)` with a stated reason.
+   - Is it a golden-master that duplicates what surviving tests already cover? → Delete.
+   - Does it pin a boundary another system depends on? → Graduate to `@contract(ref=)`.
+3. **Collapse**: Where multiple scaffold tests cover the same function, collapse into one table-driven `@decision` test with representative inputs per equivalence class.
+4. **Mutation pass**: Run mutation testing on changed files. Compare killed mutants before prune (K₀) vs after (K₁). Require K₁ ⊇ K₀. Any mutant that escapes means something load-bearing was pruned — restore or write the decision test it implies.
+5. **PR census line**: Report `written N / pruned M / survivors: X decision, Y contract, Z incident`.
+
+**Prune is a separate commit** from the refactoring itself. The reviewer sees what was deleted and why.
+
+---
 
 ## Refactoring Strategies
 
@@ -394,6 +416,12 @@ After refactoring:
 - [ ] Code quality improved
 - [ ] Documentation updated
 
+After prune:
+- [ ] Characterization tests deleted or graduated with a stated reason
+- [ ] Every surviving test tagged with `@decision`, `@contract`, or `@incident`
+- [ ] Mutation parity verified (K₁ ⊇ K₀)
+- [ ] Prune is a separate commit
+
 ## Common Pitfalls
 
 ### Refactoring Without Tests
@@ -415,6 +443,10 @@ After refactoring:
 ### Over-Engineering
 **Problem**: Making code more complex than needed.
 **Solution**: Refactor for clarity, not cleverness. YAGNI principle.
+
+### Keeping Every Characterization Test
+**Problem**: Characterization tests written to snapshot current behavior before a refactoring outlive the refactoring and become permanent bloat. They test the implementation shape, not decisions, and break on every future refactor — generating maintenance cost with no regression value.
+**Solution**: Phase 6 (Prune). Every characterization test must be explicitly graduated with a reason or deleted. The default is deletion.
 
 ## Refactoring Triggers
 
