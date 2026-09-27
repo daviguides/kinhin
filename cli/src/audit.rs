@@ -14,6 +14,8 @@ struct AuditEntry {
     file: String,
     test: String,
     tag: String,
+    #[serde(skip)]
+    parsed_tag: LifecycleTag,
     ref_value: Option<String>,
     ref_status: RefStatus,
 }
@@ -116,6 +118,7 @@ pub fn run(path: &str, format: OutputFormat) {
                 file: shorten_path(&t.file, &root),
                 test: t.name.clone().unwrap_or_else(|| "(anonymous)".into()),
                 tag: t.tag.to_string(),
+                parsed_tag: t.tag.clone(),
                 ref_value: t.ref_value.clone(),
                 ref_status,
             }
@@ -161,24 +164,13 @@ fn display_rich(entries: &[AuditEntry], census: &Census, _root: &Path) {
             _ => Color::Yellow,
         };
 
-        let tag_icon = match entry.tag.as_str() {
-            "scaffold" => "◇",
-            "characterization" => "◈",
-            "decision" => "◆",
-            "contract" => "◆",
-            "incident" => "⚡",
-            _ => "?",
-        };
-
-        let ref_display = entry
-            .ref_value
-            .as_deref()
-            .unwrap_or("—");
+        let tag_str = format!("{} {}", display::tag_icon(&entry.parsed_tag), entry.tag);
+        let ref_display = entry.ref_value.as_deref().unwrap_or("—");
 
         table.add_row(vec![
             Cell::new(&entry.file),
             Cell::new(&entry.test),
-            Cell::new(format!("{tag_icon} {}", entry.tag)).fg(tag_color),
+            Cell::new(&tag_str).fg(tag_color),
             Cell::new(ref_display),
             Cell::new(entry.ref_status.icon()).fg(entry.ref_status.color()),
         ]);

@@ -3,13 +3,16 @@ use tracing_subscriber::EnvFilter;
 
 mod agent;
 mod audit;
+#[allow(dead_code)]
 mod census;
 mod detect;
+#[allow(dead_code)]
 mod display;
 mod gate;
 mod prune;
 mod run;
 mod tag;
+#[allow(dead_code)]
 mod tags;
 
 #[derive(Copy, Clone, PartialEq, Eq, ValueEnum)]
