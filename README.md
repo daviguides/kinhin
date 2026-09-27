@@ -144,18 +144,18 @@ Without an argument, Kinhin detects languages by project markers (`pyproject.tom
 Kinhin includes a Rust CLI for lifecycle management beyond what the plugin context provides:
 
 ```bash
-cd cli && cargo build --release
-# or
 cargo install --path cli
 ```
 
-| Command | What it does |
-|---|---|
-| `kinhin audit` | Scan test files, report tags, validate refs |
-| `kinhin run` | Wrap runner with Runner Contract (no bail, parallel, random) |
-| `kinhin gate` | Mutation parity check |
-| `kinhin tag` | Auto-tag via Claude agent session |
-| `kinhin prune` | Full prune pipeline |
+| Command | Mode | What it does |
+|---|---|---|
+| `kinhin setup` | Deterministic | Check/install runner dependencies |
+| `kinhin audit` | Deterministic | Scan test files, report tags, validate refs |
+| `kinhin census` | Deterministic | Count tests by lifecycle tag |
+| `kinhin run` | Deterministic | Wrap runner with Runner Contract (no bail, parallel, random) |
+| `kinhin gate` | Deterministic | Mutation parity check (K₁ ⊇ K₀) |
+| `kinhin tag` | Agent session | Auto-tag via Claude (default: haiku) |
+| `kinhin prune` | Agent session | Full prune pipeline |
 
 See [cli/README.md](cli/README.md) for details.
 
