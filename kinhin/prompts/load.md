@@ -15,6 +15,7 @@ An argument may have been passed (e.g. `/kinhin:load rust`):
 | `python` | Universal + Python |
 | `rust` | Universal + Rust |
 | `java` | Universal + Java |
+| `typescript` | Universal + TypeScript |
 | `all` | Universal + all supported languages |
 | (none) | Universal + DETECT — procedure below |
 
@@ -24,7 +25,8 @@ An argument may have been passed (e.g. `/kinhin:load rust`):
    shallow subdirectories (max depth 3). Use Glob or:
    ```bash
    find . -maxdepth 3 \( -name pyproject.toml -o -name Cargo.toml \
-     -o -name pom.xml -o -name build.gradle -o -name build.gradle.kts \) \
+     -o -name pom.xml -o -name build.gradle -o -name build.gradle.kts \
+     -o -name tsconfig.json \) \
      -not -path "*/node_modules/*" -not -path "*/.venv/*" \
      -not -path "*/target/*" -not -path "*/.git/*" 2>/dev/null
    ```
@@ -35,12 +37,13 @@ An argument may have been passed (e.g. `/kinhin:load rust`):
    | `pyproject.toml` | python |
    | `Cargo.toml` | rust |
    | `pom.xml` / `build.gradle` / `build.gradle.kts` | java |
+   | `tsconfig.json` | typescript |
 
 3. Load the **UNION** of all detected languages (monorepos load
    multiple languages).
 4. **Nothing detected → fallback: python.**
 
-## Universal Files (6) — ALWAYS
+## Universal Files (9) — ALWAYS
 
 ### Step 1: Read TDD Methodology
 ```
@@ -55,19 +58,26 @@ Read: ~/.claude/kinhin/context/guides/tdd-bugfix-guide.md
 Read: ~/.claude/kinhin/context/guides/tdd-refactoring-guide.md
 ```
 
-### Step 3: Read Checklist
+### Step 3: Read Prune and Runner Guides
+```
+Read: ~/.claude/kinhin/context/guides/tdd-prune-guide.md
+Read: ~/.claude/kinhin/context/guides/tdd-runner-guide.md
+```
+
+### Step 4: Read Checklist and Lifecycle Tags
 ```
 Read: ~/.claude/kinhin/context/checklists/tdd-checklist.md
+Read: ~/.claude/kinhin/context/examples/tdd-lifecycle-tags.md
 ```
 
 ## Python Files (7)
 
-### Step 4a: Read Python TDD Spec
+### Step 5a: Read Python TDD Spec
 ```
 Read: ~/.claude/kinhin/spec/python-tdd/python-tdd-spec.md
 ```
 
-### Step 5a: Read Python Test Templates
+### Step 6a: Read Python Test Templates
 ```
 Read: ~/.claude/kinhin/context/examples/tdd-unit-tests.md
 Read: ~/.claude/kinhin/context/examples/tdd-integration-tests.md
@@ -79,33 +89,45 @@ Read: ~/.claude/kinhin/context/examples/tdd-anti-patterns.md
 
 ## Rust Files (2)
 
-### Step 4b: Read Rust TDD Spec
+### Step 5b: Read Rust TDD Spec
 ```
 Read: ~/.claude/kinhin/spec/rust-tdd/rust-tdd-spec.md
 ```
 
-### Step 5b: Read Rust TDD Patterns
+### Step 6b: Read Rust TDD Patterns
 ```
 Read: ~/.claude/kinhin/context/examples/rust-tdd-patterns.md
 ```
 
 ## Java Files (2)
 
-### Step 4c: Read Java TDD Spec
+### Step 5c: Read Java TDD Spec
 ```
 Read: ~/.claude/kinhin/spec/java-tdd/java-tdd-spec.md
 ```
 
-### Step 5c: Read Java TDD Patterns
+### Step 6c: Read Java TDD Patterns
 ```
 Read: ~/.claude/kinhin/context/examples/java-tdd-patterns.md
+```
+
+## TypeScript Files (2)
+
+### Step 5d: Read TypeScript TDD Spec
+```
+Read: ~/.claude/kinhin/spec/typescript-tdd/typescript-tdd-spec.md
+```
+
+### Step 6d: Read TypeScript TDD Patterns
+```
+Read: ~/.claude/kinhin/context/examples/typescript-tdd-patterns.md
 ```
 
 ---
 
 ## HALT CONDITIONS
 
-**If you responded without reading the 6 universal files plus all
+**If you responded without reading the 9 universal files plus all
 files for every resolved language: YOU VIOLATED THIS PRINCIPLE.**
 
 ---
@@ -116,10 +138,12 @@ When Kinhin TDD context is loaded, ALL implementations must be
 test-driven:
 
 1. **Test First** - Write tests before implementation
-2. **Red-Green-Refactor** - Follow the TDD cycle
+2. **Red-Green-Refactor-Prune** - Follow the 4-phase TDD cycle
 3. **Batch Processing** - Generate tests in batches
-4. **Property-Based** - Invariants via hypothesis (Python) / proptest (Rust)
+4. **Property-Based** - Invariants via hypothesis (Python) / proptest (Rust) / fast-check (TypeScript)
 5. **Anti-Hallucination** - Tests prevent LLM hallucinations
+6. **Prune** - Tag at birth, prune scaffolds before PR
+7. **Runner contract** - No bail, parallel, randomized, structured output
 
 **Rust sessions additionally**: RED includes compile errors;
 type-eliminated scenarios replace defensive tests; trait seams
@@ -130,31 +154,37 @@ NullAway/enum/record scenarios are type-eliminated; value
 constraints tested once at constructor boundaries; interface seams
 before mocks; ArchUnit rules as tests.
 
+**TypeScript sessions additionally**: RED includes type errors
+(`tsc --noEmit` is step 1); types are erased and unsound — do not
+test what strict TS proves; module mocks are scaffold smell;
+snapshot tests default to `@scaffold`.
+
 ## Confirmation
 
 After reading all files, respond with the card below, filling the
 Loaded box with the actual composition (e.g.
-`universal (6) + python (7) = 13 files` or
-`universal (6) + python (7) + rust (2) + java (2) = 17 files`):
+`universal (9) + python (7) = 16 files` or
+`universal (9) + python (7) + rust (2) + java (2) + typescript (2) = 22 files`):
 
 ```
 ╭─────────────────────────────────────────────────────╮
 │                                                     │
 │     ●        ●                                      │
 │     ↓        ↓    │  Walking Meditation for TDD     │
-│  K  I  N  H  I  N  │  経行 - Red, Green, Refactor   │
-│     ┴        ┴    │  (v1.2.0)                       │
+│  K  I  N  H  I  N  │  経行 - Red, Green, Refactor,  │
+│     ┴        ┴    │  Prune (v2.0.0)                 │
 │                                                     │
 ╰─────────────────────────────────────────────────────╯
 
 ┌─ TDD Cycle ─────────────────────────────────────────┐
-│ 🔴 RED    → Write failing test first                │
-│ 🟢 GREEN  → Make it pass (minimal code)             │
+│ 🔴 RED      → Write failing test first              │
+│ 🟢 GREEN    → Make it pass (minimal code)           │
 │ 🔵 REFACTOR → Clean up, maintain tests              │
+│ ⚪ PRUNE    → Delete scaffold, keep decisions       │
 └─────────────────────────────────────────────────────┘
 
 ┌─ Loaded ────────────────────────────────────────────┐
-│ universal (6) + {languages with counts}             │
+│ universal (9) + {languages with counts}             │
 │ = {total} files loaded                              │
 └─────────────────────────────────────────────────────┘
 ```
