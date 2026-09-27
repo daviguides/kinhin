@@ -574,3 +574,19 @@ Output token budget: cap per cluster, strip passing tests. The assistant's conte
 - Clear where new tests go?
 - Consistent patterns used?
 - Tests serve as documentation?
+
+## CLI Tools
+
+The Kinhin CLI automates the methodology defined in this spec. All commands are optional — every operation can be performed manually. When the CLI is installed, prefer it for consistency.
+
+| Concept | CLI Command | Manual Equivalent |
+|---|---|---|
+| Tag census and ref validation | `kinhin audit` | Grep for markers, check ref paths |
+| Tag count by lifecycle | `kinhin census` | Count markers manually |
+| Runner Contract execution | `kinhin run --mode loop\|full\|diagnostic` | Configure runner flags per language |
+| Install runner dependencies | `kinhin setup --install` | Install plugins per language manually |
+| Mutation parity gate | `kinhin gate --save-baseline\|--baseline` | Run mutation tool, compare results |
+| Auto-tag untagged tests | `kinhin tag` | Classify each test manually |
+| Prune pipeline | `kinhin prune` | Census → classify → collapse → delete → verify |
+
+Install: `cargo install --path cli` from the Kinhin repo. Agent commands (`tag`, `prune`) require the Claude Code CLI.

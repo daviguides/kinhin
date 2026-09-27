@@ -8,12 +8,14 @@ Prune answers: "which tests were construction scaffolding and which earned perma
 
 Reference: `@~/.claude/kinhin/spec/tdd/tdd-spec.md` → Test Lifecycle.
 
+**CLI**: `kinhin prune` automates this entire procedure. Use `kinhin prune` for a dry run (shows the plan), `kinhin prune --apply` to execute, `kinhin prune --apply --verify` to execute and run mutation parity. Without the CLI, follow the manual steps below.
+
 
 ## Procedure
 
 ### Step 1: Tag Census
 
-List all tests and their lifecycle tags:
+Use `kinhin census` for a quick count, or `kinhin audit` for the full per-test report. Manually:
 
 ```bash
 # Python
@@ -75,7 +77,9 @@ After collapse, delete tests that:
 
 Run mutation testing on changed files to verify nothing load-bearing was pruned.
 
-**Protocol:**
+**With the CLI:** `kinhin gate --save-baseline pre.json` (before prune), then `kinhin gate --baseline pre.json` (after).
+
+**Manual protocol:**
 1. Record the mutation score BEFORE prune: `K₀ = set of killed mutants`
 2. Apply the prune (delete + collapse)
 3. Re-run mutation: `K₁ = set of killed mutants`

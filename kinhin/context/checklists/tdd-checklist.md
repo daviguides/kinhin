@@ -14,7 +14,7 @@
 
 ## Runner Configuration Checklist
 
-**Before running any tests:**
+**Before running any tests** (`kinhin setup` checks all of these; `kinhin setup --install` installs missing deps):
 
 - [ ] Parallel execution enabled
 - [ ] No-bail enabled (never stop at first failure)
@@ -112,7 +112,7 @@
 
 ## Prune Checklist
 
-**Before opening the PR (after implementation and refactoring):**
+**Before opening the PR** (`kinhin prune --apply --verify` automates all of these):
 
 - [ ] Tag census taken (all tests enumerated by tag)
 - [ ] Every untagged test classified with one-line justification

@@ -144,6 +144,11 @@ test-driven:
 5. **Anti-Hallucination** - Tests prevent LLM hallucinations
 6. **Prune** - Tag at birth, prune scaffolds before PR
 7. **Runner contract** - No bail, parallel, randomized, structured output
+8. **CLI** (optional) - If `kinhin` is on PATH, use it to automate:
+   `kinhin audit` (tag report), `kinhin census` (tag counts),
+   `kinhin run` (runner contract), `kinhin setup` (install deps),
+   `kinhin tag` (auto-classify), `kinhin prune` (full pipeline),
+   `kinhin gate` (mutation parity)
 
 **Rust sessions additionally**: RED includes compile errors;
 type-eliminated scenarios replace defensive tests; trait seams

@@ -4,6 +4,8 @@
 
 How to configure and use test runners for code-assistant batch workflows. The universal spec defines a 6-point runner contract (`@~/.claude/kinhin/spec/tdd/tdd-spec.md` → Runner Contract). This guide maps the contract to concrete tools and recipes.
 
+**With the CLI:** `kinhin run --mode loop|full|diagnostic` wraps your runner with the correct flags automatically. `kinhin setup` checks and installs required runner plugins. Without the CLI, configure manually as described below.
+
 
 ## Three Run Modes
 
