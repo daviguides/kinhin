@@ -233,12 +233,142 @@ class ScannerServiceTest {
 `@DisplayName`/`@ParameterizedTest(name = ...)` for prose only when
 the method name cannot carry it.
 
+## Lifecycle Tagging
+
+JUnit 5 `@Tag` carries lifecycle markers natively.
+
+### Tag Definitions
+
+```java
+// Scaffold — construction-time, deleted at prune
+@Tag("scaffold")
+@Test
+void parserReturnsExpectedKeys() { ... }
+
+// Decision — encodes a non-obvious choice, permanent
+@Tag("decision")
+@DisplayName("deny before soft-delete: DENIED is terminal")
+@Test
+void denyPrecedesSoftDelete() { ... }
+
+// Contract — boundary another party depends on, permanent
+@Tag("contract")
+@DisplayName("Wire format: iOS BrandDetails v2")
+@Test
+void brandDetailsSerializationMatchesContract() { ... }
+
+// Incident — reproduces a production failure, permanent
+@Tag("incident")
+@DisplayName("TICKET-186: SCAN walked 250k keys per write")
+@Test
+void invalidationNeverScansKeyspace() { ... }
+```
+
+`@DisplayName` carries the reason/reference for permanent tags. The tag itself is the lifecycle; the display name is the authority.
+
+### CI Exclusion
+
+Surefire/Gradle exclude scaffolds from the production gate:
+
+**Maven (pom.xml):**
+```xml
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-surefire-plugin</artifactId>
+    <configuration>
+        <excludedGroups>scaffold</excludedGroups>
+    </configuration>
+</plugin>
+```
+
+**Gradle (build.gradle.kts):**
+```kotlin
+tasks.test {
+    useJUnitPlatform {
+        excludeTags("scaffold")
+    }
+}
+```
+
+### The Delete Set
+
+List scaffolds before prune:
+```bash
+# Maven: run only scaffolds, dry-run
+mvn test -Dgroups=scaffold -DdryRun=true
+
+# Or grep the source:
+grep -rn '@Tag("scaffold")' src/test/
+```
+
+## Runner Configuration
+
+**Requirement**: Configure for code-assistant batch workflows. Serial with bail fights batch processing.
+
+### JUnit Platform Properties (`junit-platform.properties`)
+
+```properties
+junit.jupiter.execution.parallel.enabled=true
+junit.jupiter.execution.parallel.mode.default=concurrent
+junit.jupiter.testmethod.order.default=org.junit.jupiter.api.MethodOrderer$Random
+junit.jupiter.execution.parallel.config.strategy=dynamic
+```
+
+The random seed is logged at startup for reproduction.
+
+### Build Tool Configuration
+
+**Maven — no bail:**
+```bash
+mvn test -Dmaven.test.failure.ignore=true  # report all, don't stop
+```
+
+**Gradle — no bail:**
+```bash
+gradle test --continue  # continue on failure
+```
+
+**Gradle — parallel:**
+```kotlin
+tasks.test {
+    maxParallelForks = Runtime.getRuntime().availableProcessors()
+}
+```
+
+### Structured Output
+
+Surefire XML (`target/surefire-reports/`) is the structured output format. Each file contains test name, assertion details, and stack traces — parseable by the assistant.
+
+### Changed-Set Selection
+
+```bash
+# Gradle: run tests in affected modules only
+gradle :module-a:test :module-b:test
+
+# Maven: run affected modules
+mvn test -pl module-a,module-b -amd
+```
+
+### Mutation Testing
+
+Use PIT scoped to the diff for the post-prune pass:
+```bash
+mvn org.pitest:pitest-maven:mutationCoverage \
+    -DtargetClasses="com.example.changed.*"
+```
+
 ## Coverage
+
+### Construction vs Retention
 
 Same universal targets (scenario 100%, branch ≥ 90%, constraints
 100%), measured with JaCoCo (shodo java-testing-tools-spec).
 Type-eliminated scenarios (Principle 1) count as covered BY
 CONSTRUCTION — document the type in the matrix, not a redundant test.
+
+**At GREEN (construction-time):** ≥90% branch on changed code. Scaffolds satisfy this.
+
+**After PRUNE (retention):** mutation parity on changed files (K₁ ⊇ K₀). Branch coverage MAY drop — expected after removing scaffolds.
 
 ## Anti-Hallucination (Java Form)
 
