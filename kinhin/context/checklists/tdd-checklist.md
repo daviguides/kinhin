@@ -10,6 +10,18 @@
 - [ ] Test categories identified (unit, integration, property, etc.)
 - [ ] Dependencies identified
 - [ ] Workflow selected (Test Suite First, Scenario Matrix, Feature-Complete)
+- [ ] Runner configured (see Runner Configuration Checklist)
+
+## Runner Configuration Checklist
+
+**Before running any tests:**
+
+- [ ] Parallel execution enabled
+- [ ] No-bail enabled (never stop at first failure)
+- [ ] Randomized order enabled
+- [ ] Structured reporter configured (JSON output)
+- [ ] Changed-set selection tool configured
+- [ ] Randomization seed persisted for reproduction
 
 ## Test Generation Checklist
 
@@ -21,6 +33,7 @@
 - [ ] Has clear docstring explaining what is tested
 - [ ] Has type hints on all parameters
 - [ ] Returns None (test functions)
+- [ ] Tagged at birth (`@scaffold`, `@decision`, `@contract`, or `@incident`)
 
 ### Content
 - [ ] Arranges test data explicitly (no hidden setup)
@@ -62,9 +75,9 @@
 - [ ] No implicit conversions in tests
 - [ ] All assumptions explicitly tested
 
-## Code Coverage Checklist
+## Code Coverage Checklist (at GREEN)
 
-**Coverage requirements:**
+**Coverage requirements during construction:**
 
 - [ ] Overall coverage ≥ 90%
 - [ ] Branch coverage ≥ 90%
@@ -91,11 +104,24 @@
 - [ ] Error handling implemented last
 
 ### Code Quality
-- [ ] Follows Python style standards
+- [ ] Follows language style standards
 - [ ] Type hints on all functions
 - [ ] Docstrings on all public functions
 - [ ] Error handling implemented
 - [ ] No code smells
+
+## Prune Checklist
+
+**Before opening the PR (after implementation and refactoring):**
+
+- [ ] Tag census taken (all tests enumerated by tag)
+- [ ] Every untagged test classified with one-line justification
+- [ ] All `@scaffold` tests collapsed into table-driven `@decision` tests or deleted
+- [ ] All `@characterization` tests deleted or graduated with stated reason
+- [ ] Each surviving permanent test has a `ref` or documented reason
+- [ ] Mutation pass run on changed files (K₁ ⊇ K₀ verified)
+- [ ] PR census line written: `+written N / −pruned M / survivors: X decision, Y contract, Z incident`
+- [ ] Prune changes are in a separate commit from implementation
 
 ## Post-Implementation Checklist
 
@@ -109,12 +135,12 @@
 
 ### Coverage Validation
 - [ ] Coverage report generated
-- [ ] Coverage meets requirements (≥90%)
+- [ ] Coverage meets construction requirements (≥90% at GREEN)
 - [ ] No untested code paths
 - [ ] Coverage gaps explained/justified
 
 ### Quality Validation
-- [ ] Static analysis passing (ruff, pyright)
+- [ ] Static analysis passing
 - [ ] Performance requirements met
 - [ ] No hallucination patterns detected
 - [ ] Code review completed
@@ -172,17 +198,6 @@
 - [ ] Fixture purposes documented
 - [ ] Special test configurations documented
 
-## Maintenance Checklist
-
-**For long-term maintenance:**
-
-- [ ] Tests are not brittle
-- [ ] Tests use minimal mocking
-- [ ] Test data is clear and explicit
-- [ ] Tests serve as documentation
-- [ ] Tests are easy to understand
-- [ ] Tests are easy to modify
-
 ## Final Validation Checklist
 
 **Before considering TDD complete:**
@@ -190,9 +205,10 @@
 - [ ] All pre-TDD checklist items completed
 - [ ] All test generation checklist items completed
 - [ ] All test suite completeness items validated
-- [ ] All code coverage requirements met
+- [ ] All code coverage requirements met (at GREEN)
 - [ ] All post-implementation validation passed
 - [ ] All category-specific checklists completed
+- [ ] Prune pass complete
 - [ ] Code review approved
 - [ ] CI/CD pipeline passing
 
@@ -201,7 +217,7 @@
 ### Red Flags (Stop if Found)
 - ❌ Tests written after implementation
 - ❌ Scenario matrix incomplete
-- ❌ Coverage < 90%
+- ❌ Coverage < 90% at GREEN
 - ❌ No property tests for constraints
 - ❌ Magic numbers without explanation
 - ❌ Weak assertions (just `assert result`)
@@ -209,6 +225,11 @@
 - ❌ Implicit type conversions
 - ❌ Over-mocking (mocking everything)
 - ❌ Brittle tests (break with minor changes)
+- ❌ Untagged tests at merge
+- ❌ Runner bails on first failure
+- ❌ Tests pass only in file order
+- ❌ Retry-until-green in CI
+- ❌ Survivors assert mock call counts
 
 ### Green Flags (Good Signs)
 - ✅ Tests generated in batches
@@ -221,6 +242,9 @@
 - ✅ Fast test execution
 - ✅ Tests serve as documentation
 - ✅ Easy to add new tests
+- ✅ Scaffold deleted before PR
+- ✅ One table-driven test per function
+- ✅ Randomized order with printed seed
 
 ## Workflow-Specific Checklists
 
@@ -229,21 +253,26 @@
 - [ ] All test categories identified
 - [ ] Batch test generation planned
 - [ ] Dependency order mapped
+- [ ] Prune pass planned after implementation
 
 ### For Scenario Matrix Workflow
 - [ ] Matrix completely filled
 - [ ] All combinations identified
 - [ ] Test generation from matrix automated
 - [ ] Matrix coverage validated
+- [ ] Prune pass planned after implementation
 
 ### For Feature-Complete Workflow
 - [ ] Feature specification complete
 - [ ] All components identified
 - [ ] Integration points mapped
 - [ ] End-to-end workflows documented
+- [ ] Prune pass planned after implementation
 
 ## References
 
 - TDD Spec: `@~/.claude/kinhin/spec/tdd/tdd-spec.md`
 - Implementation Guide: `@~/.claude/kinhin/context/guides/tdd-implementation-guide.md`
 - Anti-Patterns: `@~/.claude/kinhin/context/examples/tdd-anti-patterns.md`
+- Prune Guide: `@~/.claude/kinhin/context/guides/tdd-prune-guide.md`
+- Runner Guide: `@~/.claude/kinhin/context/guides/tdd-runner-guide.md`
