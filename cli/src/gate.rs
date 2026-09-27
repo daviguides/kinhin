@@ -54,7 +54,7 @@ fn tool_for_language(lang: Language) -> MutationTool {
             name: "mutmut",
             check_cmd: "mutmut",
             check_arg: "--version",
-            install_hint: "pip install mutmut",
+            install_hint: "uv pip install mutmut",
         },
         Language::Rust => MutationTool {
             name: "cargo-mutants",
@@ -77,13 +77,32 @@ fn tool_for_language(lang: Language) -> MutationTool {
     }
 }
 
-fn is_tool_available(tool: &MutationTool) -> bool {
+fn resolve_tool_cmd_in(tool: &MutationTool, root: &str) -> String {
+    if tool.name == "mutmut" {
+        let venv_path = Path::new(root).join(".venv/bin/mutmut");
+        if venv_path.exists() {
+            return venv_path.to_string_lossy().to_string();
+        }
+    }
+    tool.check_cmd.to_string()
+}
+
+fn is_tool_available(tool: &MutationTool, root: &str) -> bool {
+    let cmd = resolve_tool_cmd_in(tool, root);
+    if tool.name == "mutmut" {
+        // mutmut --version fails without config; check binary exists instead
+        return Path::new(&cmd).exists()
+            || Command::new("which")
+                .arg(&cmd)
+                .output()
+                .is_ok_and(|o| o.status.success());
+    }
     match tool.name {
         "cargo-mutants" => Command::new("cargo")
             .args(["mutants", "--version"])
             .output()
             .is_ok_and(|o| o.status.success()),
-        _ => Command::new(tool.check_cmd)
+        _ => Command::new(&cmd)
             .arg(tool.check_arg)
             .output()
             .is_ok_and(|o| o.status.success()),
@@ -156,7 +175,8 @@ fn run_mutation(root: &str, lang: Language, changed_files: &[String]) -> Option<
     let output = match lang {
         Language::Python => {
             let paths = changed_files.join(",");
-            Command::new("mutmut")
+            let cmd = resolve_tool_cmd_in(&tool_for_language(lang), root);
+            Command::new(&cmd)
                 .args(["run", "--paths-to-mutate", &paths, "--no-progress"])
                 .current_dir(root)
                 .output()
@@ -461,7 +481,7 @@ pub fn run(
     let lang = languages[0];
     let tool = tool_for_language(lang);
 
-    if !is_tool_available(&tool) {
+    if !is_tool_available(&tool, path) {
         display::print_error(&format!(
             "{} not found. Install: {}",
             tool.name, tool.install_hint

@@ -93,25 +93,59 @@ fn build_command(
 
     let program = match language {
         Language::Python => {
-            args.extend([
-                "-n".into(), "auto".into(),
-                "-p".into(), "randomly".into(),
-                "--maxfail=0".into(),
-                "-ra".into(),
-                "-q".into(),
-            ]);
+            args.extend(["--maxfail=0".into(), "-ra".into(), "-q".into()]);
+
+            let has_plugin = |name: &str| -> bool {
+                Command::new("python")
+                    .args(["-c", &format!("import {name}")])
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .status()
+                    .is_ok_and(|s| s.success())
+            };
+
+            let has_xdist = has_plugin("xdist");
+            let has_randomly = has_plugin("randomly");
+            let has_testmon = has_plugin("testmon");
+
+            if has_xdist {
+                args.extend(["-n".into(), "auto".into()]);
+            }
+            if has_randomly {
+                args.extend(["-p".into(), "randomly".into()]);
+            }
+
             match mode {
-                RunMode::Loop => args.push("--testmon".into()),
+                RunMode::Loop => {
+                    if has_testmon {
+                        args.push("--testmon".into());
+                    }
+                }
                 RunMode::Full => args.extend(["-m".into(), "not scaffold".into()]),
                 RunMode::Diagnostic => {
-                    args.retain(|a| a != "auto" && a != "randomly");
-                    args = vec![
-                        "-p".into(), "no:randomly".into(),
-                        "-p".into(), "no:xdist".into(),
-                        "-x".into(),
-                    ];
+                    args = vec!["--maxfail=0".into(), "-ra".into(), "-q".into()];
+                    if has_randomly {
+                        args.extend(["-p".into(), "no:randomly".into()]);
+                    }
+                    if has_xdist {
+                        args.extend(["-p".into(), "no:xdist".into()]);
+                    }
+                    args.push("-x".into());
                 }
             }
+
+            let mut missing: Vec<&str> = Vec::new();
+            if !has_xdist { missing.push("pytest-xdist"); }
+            if !has_randomly { missing.push("pytest-randomly"); }
+            if !has_testmon && mode == RunMode::Loop { missing.push("pytest-testmon"); }
+            if !missing.is_empty() {
+                display::print_warning(&format!(
+                    "Optional plugins not found: {}. Install: uv pip install {}",
+                    missing.join(", "),
+                    missing.join(" "),
+                ));
+            }
+
             "pytest".to_string()
         }
 
