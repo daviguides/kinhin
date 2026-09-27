@@ -174,10 +174,9 @@ fn run_mutation(root: &str, lang: Language, changed_files: &[String]) -> Option<
 
     let output = match lang {
         Language::Python => {
-            let paths = changed_files.join(",");
             let cmd = resolve_tool_cmd_in(&tool_for_language(lang), root);
             Command::new(&cmd)
-                .args(["run", "--paths-to-mutate", &paths, "--no-progress"])
+                .args(["run"])
                 .current_dir(root)
                 .output()
         }

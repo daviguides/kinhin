@@ -238,6 +238,33 @@ fn tag_style(tag: &str) -> (Color, &'static str) {
 }
 
 fn insert_tags(content: &str, suggestions: &[TagSuggestion], lang: Language) -> String {
+    let needs_pytest_markers = lang == Language::Python && !suggestions.is_empty();
+
+    if needs_pytest_markers && !content.contains("import pytest") {
+        let lines: Vec<&str> = content.lines().collect();
+        let mut result: Vec<String> = Vec::with_capacity(lines.len() + 2);
+        let mut insert_idx = 0;
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("import ") || trimmed.starts_with("from ") {
+                insert_idx = i + 1;
+            }
+        }
+        for (i, line) in lines.iter().enumerate() {
+            if i == insert_idx {
+                result.push("import pytest".to_string());
+                result.push(String::new());
+            }
+            result.push(line.to_string());
+        }
+        let new_content = result.join("\n");
+        return insert_tags_inner(&new_content, suggestions, lang);
+    }
+
+    insert_tags_inner(content, suggestions, lang)
+}
+
+fn insert_tags_inner(content: &str, suggestions: &[TagSuggestion], lang: Language) -> String {
     let lines: Vec<&str> = content.lines().collect();
     let mut result: Vec<String> = Vec::with_capacity(lines.len() + suggestions.len());
     let mut tagged_tests: std::collections::HashMap<&str, &TagSuggestion> =
