@@ -139,6 +139,26 @@ kinhin/
 
 Without an argument, Kinhin detects languages by project markers (`pyproject.toml` → Python, `Cargo.toml` → Rust, `pom.xml`/`build.gradle`/`build.gradle.kts` → Java, `tsconfig.json` → TypeScript) — in the current directory, ancestors, and shallow subdirectories — and loads the union (monorepos load multiple languages). Nothing detected → Python fallback. Universal files (methodology, guides, checklists, prune guide, runner guide, lifecycle tags) load always.
 
+## CLI
+
+Kinhin includes a Rust CLI for lifecycle management beyond what the plugin context provides:
+
+```bash
+cd cli && cargo build --release
+# or
+cargo install --path cli
+```
+
+| Command | What it does |
+|---|---|
+| `kinhin audit` | Scan test files, report tags, validate refs |
+| `kinhin run` | Wrap runner with Runner Contract (no bail, parallel, random) |
+| `kinhin gate` | Mutation parity check |
+| `kinhin tag` | Auto-tag via Claude agent session |
+| `kinhin prune` | Full prune pipeline |
+
+See [cli/README.md](cli/README.md) for details.
+
 ## License
 
 MIT License
