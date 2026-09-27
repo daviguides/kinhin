@@ -124,7 +124,7 @@ fn parse_tags(path: &Path, content: &str, lang: Language) -> Vec<TaggedTest> {
 
 fn parse_python_tags(path: &Path, content: &str) -> Vec<TaggedTest> {
     let mut results = Vec::new();
-    let re_func = Regex::new(r"(?m)^def (test_\w+)").unwrap();
+    let re_func = Regex::new(r"(?m)^\s*def (test_\w+)").unwrap();
     let re_scaffold = Regex::new(r"@pytest\.mark\.scaffold").unwrap();
     let re_characterization = Regex::new(r"@pytest\.mark\.characterization").unwrap();
     let re_decision = Regex::new(r#"@pytest\.mark\.decision\((?:reason=)?"([^"]+)""#).unwrap();
