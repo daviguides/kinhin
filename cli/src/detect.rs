@@ -3,7 +3,7 @@ use std::path::Path;
 
 use walkdir::WalkDir;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, clap::ValueEnum)]
 pub enum Language {
     Python,
     Rust,

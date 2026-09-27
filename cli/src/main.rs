@@ -5,6 +5,7 @@ mod audit;
 mod census;
 mod detect;
 mod display;
+mod run;
 mod tags;
 
 #[derive(Copy, Clone, PartialEq, Eq, ValueEnum)]
@@ -50,7 +51,27 @@ enum Commands {
     },
 
     /// Wrap the test runner with Runner Contract config
-    Run,
+    Run {
+        /// Run mode: loop (changed-set), full (gate), diagnostic (isolate flake)
+        #[arg(long, value_enum, default_value_t = run::RunMode::Loop)]
+        mode: run::RunMode,
+
+        /// Language override (auto-detects if omitted)
+        #[arg(long, value_enum)]
+        lang: Option<detect::Language>,
+
+        /// TypeScript runner override: jest or vitest (auto-detects if omitted)
+        #[arg(long, value_enum)]
+        ts_runner: Option<run::TsRunner>,
+
+        /// Directory to run in (defaults to current directory)
+        #[arg(long, default_value = ".")]
+        path: String,
+
+        /// Extra arguments passed through to the underlying test runner
+        #[arg(last = true)]
+        extra: Vec<String>,
+    },
 
     /// Run mutation parity gate (K₁ ⊇ K₀)
     Gate,
@@ -84,9 +105,8 @@ fn main() {
             let census = census::Census::from_tests(&tests);
             census.display(cli.output);
         }
-        Commands::Run => {
-            eprintln!("kinhin run: not yet implemented (Phase 7b)");
-            std::process::exit(1);
+        Commands::Run { mode, lang, ts_runner, ref path, ref extra } => {
+            run::run(mode, lang, ts_runner, path, extra);
         }
         Commands::Gate => {
             eprintln!("kinhin gate: not yet implemented (Phase 7c)");
