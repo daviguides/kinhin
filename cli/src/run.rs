@@ -58,7 +58,7 @@ pub fn run(
     }
 
     let language = languages[0];
-    let (program, args) = build_command(language, mode, ts_runner, extra_args);
+    let (program, args) = build_command(language, mode, ts_runner, path, extra_args);
 
     print_header(mode, language, &program, &args);
 
@@ -83,25 +83,43 @@ pub fn run(
     }
 }
 
+fn uses_uv(path: &str) -> bool {
+    std::path::Path::new(path).join("uv.lock").exists()
+        || std::path::Path::new(path).join(".python-version").exists()
+            && std::path::Path::new(path).join("pyproject.toml").exists()
+}
+
 fn build_command(
     language: Language,
     mode: RunMode,
     ts_runner: Option<TsRunner>,
+    path: &str,
     extra: &[String],
 ) -> (String, Vec<String>) {
     let mut args: Vec<String> = Vec::new();
+    let uv = uses_uv(path);
 
     let program = match language {
         Language::Python => {
             args.extend(["--maxfail=0".into(), "-ra".into(), "-q".into()]);
 
             let has_plugin = |name: &str| -> bool {
-                Command::new("python")
-                    .args(["-c", &format!("import {name}")])
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .status()
-                    .is_ok_and(|s| s.success())
+                let import_stmt = format!("import {name}");
+                if uv {
+                    Command::new("uv")
+                        .args(["run", "python", "-c", &import_stmt])
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .status()
+                        .is_ok_and(|s| s.success())
+                } else {
+                    Command::new("python")
+                        .args(["-c", &import_stmt])
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .status()
+                        .is_ok_and(|s| s.success())
+                }
             };
 
             let has_xdist = has_plugin("xdist");
@@ -145,7 +163,13 @@ fn build_command(
                 ));
             }
 
-            "pytest".to_string()
+            if uv {
+                args.insert(0, "pytest".into());
+                args.insert(0, "run".into());
+                "uv".to_string()
+            } else {
+                "pytest".to_string()
+            }
         }
 
         Language::Rust => {
@@ -201,6 +225,11 @@ fn build_command(
 
         Language::TypeScript => {
             let runner = ts_runner.unwrap_or_else(|| detect_ts_runner());
+            let runner_name = match runner {
+                TsRunner::Jest => "jest",
+                TsRunner::Vitest => "vitest",
+            };
+
             match runner {
                 TsRunner::Jest => {
                     args.extend([
@@ -218,7 +247,6 @@ fn build_command(
                         }
                         RunMode::Diagnostic => args.push("--runInBand".into()),
                     }
-                    "jest".to_string()
                 }
                 TsRunner::Vitest => {
                     args.extend(["run".into(), "--reporter=json".into()]);
@@ -237,14 +265,28 @@ fn build_command(
                             ]);
                         }
                     }
-                    "vitest".to_string()
                 }
             }
+
+            let pkg_runner = detect_pkg_runner(path);
+            args.insert(0, runner_name.into());
+            pkg_runner
         }
     };
 
     args.extend(extra.iter().cloned());
     (program, args)
+}
+
+fn detect_pkg_runner(path: &str) -> String {
+    let p = std::path::Path::new(path);
+    if p.join("bun.lockb").exists() || p.join("bun.lock").exists() {
+        "bunx".to_string()
+    } else if p.join("pnpm-lock.yaml").exists() {
+        "pnpx".to_string()
+    } else {
+        "npx".to_string()
+    }
 }
 
 fn detect_ts_runner() -> TsRunner {
