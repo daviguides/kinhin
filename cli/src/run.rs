@@ -140,9 +140,8 @@ fn build_command(
             if !has_testmon && mode == RunMode::Loop { missing.push("pytest-testmon"); }
             if !missing.is_empty() {
                 display::print_warning(&format!(
-                    "Optional plugins not found: {}. Install: uv pip install {}",
+                    "Optional plugins not found: {}. Run: kinhin setup --install",
                     missing.join(", "),
-                    missing.join(" "),
                 ));
             }
 

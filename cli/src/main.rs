@@ -11,6 +11,7 @@ mod display;
 mod gate;
 mod prune;
 mod run;
+mod setup;
 mod tag;
 #[allow(dead_code)]
 mod tags;
@@ -114,6 +115,17 @@ enum Commands {
         path: String,
     },
 
+    /// Check and install runner dependencies
+    Setup {
+        /// Directory to check (defaults to current directory)
+        #[arg(default_value = ".")]
+        path: String,
+
+        /// Install missing dependencies (default: check only)
+        #[arg(long)]
+        install: bool,
+    },
+
     /// Prune construction tests: census → classify → collapse → verify
     Prune {
         /// Language override (auto-detects if omitted)
@@ -155,6 +167,18 @@ fn main() {
             let tests = tags::scan_test_files(path, &languages);
             let census = census::Census::from_tests(&tests);
             census.display(cli.output);
+        }
+        Commands::Setup { ref path, install } => {
+            if install {
+                setup::install(path);
+            } else {
+                let ok = setup::check(path);
+                if !ok {
+                    println!();
+                    display::print_warning("Run `kinhin setup --install` to install missing deps.");
+                    std::process::exit(1);
+                }
+            }
         }
         Commands::Run {
             mode,
