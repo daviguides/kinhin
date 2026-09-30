@@ -70,3 +70,61 @@ Mockito, Testcontainers, ArchUnit, JaCoCo) lives in shodo's
 Kinhin was extracted from Zazen to separate concerns:
 - **Zazen**: Code quality principles (151 test cases)
 - **Kinhin**: TDD practices (45 test cases)
+
+---
+
+## Releasing — mandatory workflow
+
+Every plugin modification MUST follow this sequence. No exceptions.
+
+### 1. Bump version
+
+Patch for fixes/tweaks, minor for new skills or behavioral changes:
+
+```bash
+# From gradients/kinhin/
+# Edit .claude-plugin/plugin.json version field
+# Also update install.sh header if it shows a version
+```
+
+### 2. Commit and push
+
+```bash
+git add -A && git commit -m "bump: vX.Y.Z — <what changed>"
+git tag -a vX.Y.Z -m "<what changed>"
+git push && git push origin vX.Y.Z
+```
+
+### 3. Run install.sh
+
+```bash
+~/work/sources/continuum/gradients/kinhin/install.sh
+```
+
+Note: install.sh clones from the GitHub remote (not local source), so
+the push in step 2 must land before running it.
+
+### 4. Verify cache is not stale
+
+The plugin cache (`~/.claude/plugins/cache/daviguides/kinhin/`) is
+unstable — even after a successful install, it can preserve stale
+state from previous versions. This is a known unresolved bug in the
+Claude Code plugin system.
+
+After install, always verify:
+
+```bash
+# Compare installed vs source timestamps
+diff <(ls -lR ~/.claude/kinhin/skills/) <(ls -lR skills/)
+
+# Check cache version matches
+ls ~/.claude/plugins/cache/daviguides/kinhin/
+
+# If stale, nuke cache and reinstall
+rm -rf ~/.claude/plugins/cache/daviguides/kinhin/
+rm -rf ~/.claude/kinhin/
+./install.sh
+```
+
+Do NOT move to the next task with a stale cache — the session will
+load outdated skills silently.
