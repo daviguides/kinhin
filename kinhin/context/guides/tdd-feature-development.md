@@ -97,16 +97,18 @@ Generate test files:
 Generate all test files simultaneously with complete implementations.
 ```
 
-### Phase 4: Implementation in Dependency Order
+### Phase 4: Implementation — Wiring First
 
-**Objective**: Implement all components in order that respects dependencies.
+**Objective**: Implement the wiring skeleton first, then fill in modules.
+
+See `tdd-spec.md` → *Dependency Implementation Order* → *Wiring First*.
 
 **Implementation Order:**
-1. **Data Models** - Define all domain models and types
-2. **Core Utilities** - Implement helper functions
-3. **Business Logic** - Implement core feature logic
-4. **Integration Layers** - Connect to external systems
-5. **API/Interface** - Expose feature functionality
+1. **Wiring Skeleton** - Thinnest end-to-end path with stubs and codebase fixtures
+2. **Data Models** - Define all domain models and types
+3. **Core Utilities** - Implement helper functions
+4. **Business Logic** - Implement core feature logic
+5. **Replace Stubs** - Swap stubs with real modules (skeleton tests keep passing)
 6. **Error Handling** - Add comprehensive error handling
 
 **Prompt Template:**

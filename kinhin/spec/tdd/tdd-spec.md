@@ -367,21 +367,94 @@ One stop at the **end** of execution, not a pause in the middle.
 
 **Escape hatch**: When the user's instruction **is** the authority change ("we're dropping the 30-day grace period"), the assistant may edit the test **and** must update the `ref` target in the same change. Instruction-in-hand counts as approval.
 
+## Authority Source per Block
+
+**Requirement**: During PLANNING, classify each block by where its test authority lives. The implementing session receives this classification, it does not decide it.
+
+### Three Authority Sources
+
+| Source | Block type | Test requirement | Example |
+|--------|-----------|-----------------|---------|
+| **Plan** | Pure logic (validation, calculation, formatting) | Unit test. Authority is the plan/spec | `validateConfirmation()`, `truncateAnswer()` |
+| **Existing codebase** | Wiring/orchestration (connects modules, calls SDKs) | `@contract` test with fixture copied from the code that already consumes this boundary. Never invent the fixture | `index.ts` calling `runAgentTurn` — copy the pattern from `ask.service.ts` |
+| **Brief/acceptance criteria** | Feature acceptance (the thing the user asked for) | e2e test against isolated environment (test channel, staging, recorded replay) | "Event in Slack → response out" |
+
+### Default Classification
+
+Any block whose files import an SDK client, network client, queue client, or database client is **wiring** by default. The plan can only UPGRADE (pure → wiring → acceptance), never DOWNGRADE (wiring → pure).
+
+### Wiring Blocks: Copy, Don't Invent
+
+For every wiring boundary, the plan MUST cite the existing code that already consumes it:
+
+```markdown
+### Bloco wiring
+- Boundary: runAgentTurn result
+  Pattern: ask.service.ts:166-220 (how it extracts the response)
+  COPY this pattern. Do not invent.
+```
+
+If no existing code consumes the boundary (new SDK, new API), the plan says so and requires reading the SDK types/docs/examples before writing the test fixture.
+
+**Hand-authored mocks of an external shape are `@scaffold` by default.** They die at prune unless promoted with evidence that the shape matches the real system.
+
+### Rung Check
+
+Before writing a test for a wiring block, ask: "can a type refuse the wrong state?" A typed extraction function (`extractToolInput(messages): EngbotResponse`) where the wrong field is a compile error is rung 1 — no test needed for that path. Ask for the highest rung first:
+
+1. **Type constraint** (compiler refuses) → no test
+2. **Structural invariant** → arch test
+3. **`@contract` with fixture from codebase** → the standard for wiring
+4. **`@decision` with inline reason** → pure logic
+5. **`@scaffold`** → dies at prune
+
+## RED Evidence
+
+**Requirement**: The RED phase must produce observable evidence. A test that was never seen failing before passing is `@scaffold` by definition — it proves the code matches itself, not the spec.
+
+**Mechanism**: Before implementing the code for a block, run the tests. Record the failing output:
+
+```bash
+npx jest --testPathPattern "block-N" 2>&1 | tee red-evidence-block-N.log
+# Exit code must be non-zero. If all tests pass, the RED phase did not happen.
+```
+
+If all tests pass before implementation, either:
+- The tests are too weak (they pass on any code)
+- The implementation already exists (skip the block)
+- The tests were written to match the code, not the spec (rewrite them)
+
+**No new tooling required.** RED evidence is a log file, not a framework.
+
 ## Dependency Implementation Order
 
-### Test-First Approach
-**Requirement**: Generate all tests before implementation.
+### Wiring First (Walking Skeleton)
 
-**Process:**
-1. Design complete test suite
-2. Generate all test files
-3. Implement in dependency order:
-   - Data models and types
-   - Core utility functions
-   - Business logic functions
-   - Integration layers
-   - Error handling
-4. **Prune**: Tag census, collapse scaffolds, verify mutation parity
+**Requirement**: The first block implemented is the thinnest end-to-end path. Pure modules come second.
+
+The default dependency order (types → utils → logic → integration → error handling) puts the wiring LAST, under the fullest context and lowest attention. This is where the hardest bugs live.
+
+**Inverted order:**
+1. **Wiring skeleton** — the thinnest path from input to output, using stubs for modules that don't exist yet, with fixtures from the codebase for external boundaries
+2. Data models and types
+3. Core utility functions
+4. Business logic functions
+5. Replace stubs with real modules (skeleton tests keep passing)
+6. Error handling
+7. **Prune**: Tag census, collapse scaffolds, verify mutation parity
+
+**Benefit**: The integration seam is exercised first while context is fresh. Pure modules fill in later and the skeleton catches regressions.
+
+### Test-First Approach
+**Requirement**: Generate tests before implementation for each block.
+
+**Process per block:**
+1. Write tests (tagged at birth)
+2. Run tests → RED (record evidence)
+3. Implement → GREEN
+4. Run validation.sh --block N
+5. Fix if fails (≤2 rounds, per arché anti-babysitting)
+6. Commit
 
 **Benefit**: Clear roadmap and comprehensive coverage.
 
