@@ -90,6 +90,52 @@ Kinhin was extracted from Zazen to separate concerns:
 - **Zazen**: Code quality principles (151 test cases)
 - **Kinhin**: TDD practices (45 test cases)
 
+## Runner entries (per mode and per language)
+
+`/kinhin:load` (interactive) keeps loading the union: universal +
+detected languages. The runner does not detect: it compiles one thin
+entry per mode plus one per task language, so each SDK session pays
+only what its mode uses. Entries are files in `kinhin/prompts/` with
+direct `Read:` lines only (no entry references another entry; the
+compiler caps depth at 2) and carry no card: the runner never shows
+it, and every token in the system prompt is paid on every API call.
+
+| Entry | Files | Mode |
+|---|---|---|
+| `load-planning` | tdd-spec, tdd-feature-development, tdd-bugfix-guide, tdd-refactoring-guide | PLANNING, PLAN_REVIEWING |
+| `load-implementing` | tdd-spec, tdd-implementation-guide, tdd-lifecycle-tags, tdd-runner-guide, tdd-anti-patterns | IMPLEMENTING |
+| `load-validating` | tdd-checklist, tdd-prune-guide, tdd-runner-guide, tdd-anti-patterns | VALIDATING |
+| `load-python` | python-tdd-spec, tdd-unit/integration/property/error-handling/performance-tests | IMPLEMENTING, VALIDATING |
+| `load-rust` / `load-java` / `load-typescript` | `<lang>-tdd-spec`, `<lang>-tdd-patterns` | IMPLEMENTING, VALIDATING |
+
+Classification notes:
+- `tdd-spec` sits in planning AND implementing: planning needs authority
+  per block, scenario matrix, 3-question gate and dependency order;
+  implementing needs RED evidence, naming and structure. The two never
+  share a session, so nothing is paid twice.
+- `tdd-anti-patterns` is language-generic (it lived under Python only by
+  placement), so it moves to implementing and validating.
+- `tdd-runner-guide` is in implementing (inner loop, changed-set runs)
+  and validating (flake protocol, full runs).
+- The validator gets the checklist, not `tdd-spec`: the checklist is the
+  distilled, checkable form of the spec.
+
+Compiled size (`compile_plugin("kinhin", prompt=<entry>)`, ~chars/3.6):
+
+| Entry | Chars | ~Tokens |
+|---|---|---|
+| `load` (union, all languages) | SIZE_load | TOK_load |
+| `load-planning` | SIZE_load-planning | TOK_load-planning |
+| `load-implementing` | SIZE_load-implementing | TOK_load-implementing |
+| `load-validating` | SIZE_load-validating | TOK_load-validating |
+| `load-python` | SIZE_load-python | TOK_load-python |
+| `load-rust` | SIZE_load-rust | TOK_load-rust |
+| `load-java` | SIZE_load-java | TOK_load-java |
+| `load-typescript` | SIZE_load-typescript | TOK_load-typescript |
+
+When adding a spec file: put its `Read:` line in `load.md` (interactive
+union) AND in every runner entry whose mode uses it.
+
 ---
 
 ## Releasing — mandatory workflow
