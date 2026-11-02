@@ -124,14 +124,14 @@ Compiled size (`compile_plugin("kinhin", prompt=<entry>)`, ~chars/3.6):
 
 | Entry | Chars | ~Tokens |
 |---|---|---|
-| `load` (union, all languages) | SIZE_load | TOK_load |
-| `load-planning` | SIZE_load-planning | TOK_load-planning |
-| `load-implementing` | SIZE_load-implementing | TOK_load-implementing |
-| `load-validating` | SIZE_load-validating | TOK_load-validating |
-| `load-python` | SIZE_load-python | TOK_load-python |
-| `load-rust` | SIZE_load-rust | TOK_load-rust |
-| `load-java` | SIZE_load-java | TOK_load-java |
-| `load-typescript` | SIZE_load-typescript | TOK_load-typescript |
+| `load` (union, all languages) | 274,699 | 76.3k |
+| `load-planning` | 64,677 | 18.0k |
+| `load-implementing` | 83,959 | 23.3k |
+| `load-validating` | 48,314 | 13.4k |
+| `load-python` | 72,644 | 20.2k |
+| `load-rust` | 18,797 | 5.2k |
+| `load-java` | 21,174 | 5.9k |
+| `load-typescript` | 19,371 | 5.4k |
 
 When adding a spec file: put its `Read:` line in `load.md` (interactive
 union) AND in every runner entry whose mode uses it.
