@@ -177,7 +177,7 @@ Loaded box with the actual composition (e.g.
 │     ●        ●                                      │
 │     ↓        ↓    │  Walking Meditation for TDD     │
 │  K  I  N  H  I  N  │  経行 - Red, Green, Refactor,  │
-│     ┴        ┴    │  Prune (v2.0.0)                 │
+│     ┴        ┴    │  Prune (v2.2.1)                 │
 │                                                     │
 ╰─────────────────────────────────────────────────────╯
 

@@ -1,6 +1,6 @@
 {
     "name": "kinhin",
-    "version": "2.2.0",
+    "version": "2.2.1",
     "description": "Kinhin (経行) - Walking Meditation for TDD (Python, Rust, Java & TypeScript)",
     "author": {
         "name": "Davi Guides",
