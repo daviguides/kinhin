@@ -1,9 +1,5 @@
 # TDD Anti-Patterns (LLM-Optimized)
 
-## Overview
-
-Common anti-patterns in TDD, especially when using LLMs. Avoid these patterns to maintain code quality and prevent hallucinations.
-
 ## Test Generation Anti-Patterns
 
 ### Anti-Pattern 1: Sequential Test Generation
@@ -103,34 +99,7 @@ def test_calculate_discount_all_scenarios(...):
 ## Test Structure Anti-Patterns
 
 ### Anti-Pattern 4: Magic Numbers Without Explanation
-
-**Problem**: Using unexplained magic numbers in tests.
-
-**Why It's Bad**:
-- Hard to understand test intent
-- Hard to maintain
-- May hide business rules
-- Difficult to debug failures
-
-**Bad Example**:
-```python
-def test_discount():
-    result = calculate_discount(user, Decimal("100"))
-    assert result == Decimal("10")  # Why 10?
-```
-
-**Good Example**:
-```python
-def test_premium_user_gets_10_percent_discount():
-    """Test premium users get 10% discount."""
-    PREMIUM_DISCOUNT_RATE = Decimal("0.10")
-    amount = Decimal("100")
-    expected_discount = amount * PREMIUM_DISCOUNT_RATE
-
-    result = calculate_discount(premium_user, amount)
-
-    assert result == expected_discount
-```
+Literals that carry a business rule get a name (constant or test name). Owned by zazen (naming spec → Magic Values Prohibition).
 
 ### Anti-Pattern 5: Multiple Concerns Per Test
 
@@ -308,8 +277,7 @@ def test_amount_calculation():
     amount = Decimal("10.50")  # Explicit
     result = calculate_total(amount)
 
-    # Explicit type check
-    assert isinstance(result, Decimal)
+    # The return type is the type checker's job (rung 1), not an assertion
     assert result == Decimal("10.50")
 ```
 
@@ -410,10 +378,13 @@ def test_format_user_includes_all_fields():
     user = User(id=1, name="Test", email="test@example.com")
     result = format_user(user)
 
-    # Flexible: tests behavior not format
-    assert "Test" in result
-    assert "test@example.com" in result
-    assert "1" in result
+    # Strict on values, free on layout: each value appears exactly once,
+    # and the ID is a whole token (not any "1" in the string)
+    assert result.count("Test") == 1
+    assert result.count("test@example.com") == 1
+    assert re.search(r"\b1\b", result)
+    # When the exact layout IS a contract with a consumer, assert the full
+    # string and tag the test @contract instead.
 ```
 
 ### Anti-Pattern 13: Over-Mocking
@@ -458,32 +429,7 @@ def test_process_order():
 ## LLM-Specific Anti-Patterns
 
 ### Anti-Pattern 14: Context Fragmentation
-
-**Problem**: Spreading related tests across multiple prompts.
-
-**Why It's Bad**:
-- Inconsistent patterns
-- Lost context
-- Duplicate code
-- Hallucination risk
-
-**Bad Practice**:
-```
-Prompt 1: Generate test for user creation
-Prompt 2: Generate test for user update
-Prompt 3: Generate test for user deletion
-```
-
-**Good Practice**:
-```
-Generate complete test suite for user CRUD operations:
-- Create user (valid data, invalid data, duplicate email)
-- Update user (valid update, nonexistent user, invalid data)
-- Delete user (existing user, nonexistent user)
-- Read user (existing user, nonexistent user)
-
-Use consistent patterns across all tests.
-```
+Same anti-pattern as #1 (Sequential Test Generation) seen from the prompt side: related tests split across prompts. Rule: tdd-spec → Batch Processing Over Sequential.
 
 ### Anti-Pattern 15: Insufficient Property Testing
 
@@ -667,162 +613,13 @@ def test_discount_cap():
 ## Runner Anti-Patterns
 
 ### Anti-Pattern 20: Bail on First Failure
-
-**Problem**: Using `-x` / `--bail` / `--maxfail=1` during the fix loop.
-
-**Why It's Bad**:
-- Code assistants process in batch — seeing ALL failures at once is dramatically more efficient
-- Serial fix→run→fail→fix cycle wastes time re-running the entire suite for each failure
-- Hides the true scope of breakage: 1 visible failure may mask 40 related ones
-- Prevents cause clustering (grouping failures by root cause)
-
-**Bad Example**:
-```bash
-pytest -x  # Stops at first failure
-jest --bail  # Same problem
-```
-
-**Good Example**:
-```bash
-pytest --maxfail=0 -n auto -p randomly  # All failures, parallel, randomized
-jest --no-bail --maxWorkers=50%  # Same approach
-```
+`-x` / `--bail` / `--maxfail=1` in the fix loop: one visible failure hides the rest, the fix→run cycle goes serial, cause clustering is impossible. Rule: tdd-spec → Runner Contract #1 (No Bail).
 
 ### Anti-Pattern 21: Order-Dependent Tests
-
-**Problem**: Tests that pass in a fixed sequence but fail when randomized.
-
-**Why It's Bad**:
-- Indicates shared state between tests (global variables, database rows, file system)
-- Parallelization is impossible without isolation
-- A passing suite gives false confidence — the tests verify order, not behavior
-- Flaky failures when CI randomizes or parallelizes
-
-**Bad Example**:
-```python
-# test_a creates a user
-def test_create_user():
-    create_user({"name": "Test"})
-
-# test_b assumes test_a ran first
-def test_get_user():
-    user = get_user_by_name("Test")  # Fails if test_a didn't run
-    assert user.name == "Test"
-```
-
-**Good Example**:
-```python
-# Each test creates its own state
-def test_create_user():
-    user = create_user({"name": "Test"})
-    assert user.id is not None
-
-def test_get_user():
-    created = create_user({"name": "Test"})  # Own setup
-    user = get_user(created.id)
-    assert user.name == "Test"
-```
+A test passes only after another ran (shared global, DB row, file): it verifies order, not behavior. Rule: tdd-spec → Test Independence and Runner Contract #2–#3 (an order-only failure is `isolation-dependent`, a bug to fix).
 
 ### Anti-Pattern 22: Retry Until Green
-
-**Problem**: Automatically retrying failed tests until they pass, masking flakiness.
-
-**Why It's Bad**:
-- Hides the exact information the assistant needs to fix the test
-- A test that passes on retry 3 has a real bug — shared state, timing, or external dependency
-- Retry-until-green in CI means the suite lies about its own health
-- The assistant, seeing green, moves on — the flake recurs on the next run
-
-**Bad Example**:
-```toml
-# pytest-rerunfailures configured globally
-[tool.pytest.ini_options]
-reruns = 3
-reruns_delay = 1
-```
-
-**Good Example**:
-```bash
-# Three-run flake protocol:
-# 1. Test fails in full run
-# 2. Rerun isolated in fresh process (×3)
-#    - Still fails → deterministic-fail (real bug)
-#    - Passes isolated → rerun in original order with original seed
-#      - Fails → isolation-dependent (shared state bug)
-#      - Passes → flaky (timing/external, quarantine with ticket)
-```
+Auto-retry (`reruns`, `--retryTimes`) as a gate reports isolation bugs and flakes as "passed". Rule: tdd-spec → Runner Contract #4 (three-run protocol, three verdicts; retry only inside diagnostic mode).
 
 ### Anti-Pattern 23: Diff-String Debugging
-
-**Problem**: Assistant parsing pretty-printed diffs with ANSI color codes to understand test failures.
-
-**Why It's Bad**:
-- ANSI codes consume tokens for zero semantic value
-- Pretty-printed diffs are formatted for human readability, not machine parsing
-- The assistant re-derives the delta from a visual representation instead of working with data
-- Large diffs overflow context and obscure the actual mismatch
-
-**Bad Example**:
-```
-# Default jest output — tokens spent on formatting
-Expected: {"name": "Test", "email": "test@example.com", "role": "admin"}
-Received: {"name": "Test", "email": "test@example.com", "role": "user"}
-
-- Expected  - 1
-+ Received  + 1
-
-  Object {
-    "email": "test@example.com",
-    "name": "Test",
--   "role": "admin",
-+   "role": "user",
-  }
-```
-
-**Good Example**:
-```bash
-# Structured JSON output — assertion operands as data
-jest --json --outputFile=results.json
-# or
-vitest --reporter=json
-
-# The assistant reads: expected="admin", actual="user", field="role"
-# No parsing, no ANSI, no token waste
-```
-
-## Detection Checklist
-
-Use this checklist to detect anti-patterns in your tests:
-
-- [ ] Are tests generated in batches (not sequentially)?
-- [ ] Are tests written before implementation?
-- [ ] Is scenario matrix coverage complete?
-- [ ] Are magic numbers explained?
-- [ ] Does each test have single concern?
-- [ ] Is test setup visible and clear?
-- [ ] Are assertions strong and specific?
-- [ ] Do assertions have helpful messages?
-- [ ] Are types explicit (no implicit conversions)?
-- [ ] Are all constraints tested?
-- [ ] Is cross-function consistency validated?
-- [ ] Are tests maintainable (not brittle)?
-- [ ] Is mocking minimal (only external dependencies)?
-- [ ] Is context preserved across related tests?
-- [ ] Are property-based tests used for invariants?
-- [ ] Are all tests tagged at birth?
-- [ ] Are scaffold/characterization tests pruned before PR?
-- [ ] Are permanent tests asserting behavior, not mechanism?
-- [ ] Is mutation parity used for retention (not coverage)?
-- [ ] Are permanent tests treated as spec (not edited to match code)?
-- [ ] Is the runner configured with no-bail?
-- [ ] Do tests pass in randomized order?
-- [ ] Are flaky tests classified (not retried into silence)?
-- [ ] Is the assistant reading structured output (not ANSI diffs)?
-
-## References
-
-- TDD Spec: `@~/.claude/kinhin/spec/tdd/tdd-spec.md`
-- Implementation Guide: `@~/.claude/kinhin/context/guides/tdd-implementation-guide.md`
-- Test Templates: `@~/.claude/kinhin/context/examples/tdd-unit-tests.md`
-- Prune Guide: `@~/.claude/kinhin/context/guides/tdd-prune-guide.md`
-- Runner Guide: `@~/.claude/kinhin/context/guides/tdd-runner-guide.md`
+Reading pretty-printed ANSI diffs instead of structured operands wastes tokens and hides the delta. Rule: tdd-spec → Runner Contract #6 (machine-readable output, cause clustering).

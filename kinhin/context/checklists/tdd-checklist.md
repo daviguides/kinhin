@@ -1,28 +1,5 @@
 # TDD Quality Checklist
 
-## Pre-TDD Checklist
-
-**Before starting test-driven development:**
-
-- [ ] Requirements clearly understood
-- [ ] Feature specification documented (for new features)
-- [ ] Scenario matrix defined
-- [ ] Test categories identified (unit, integration, property, etc.)
-- [ ] Dependencies identified
-- [ ] Workflow selected (Test Suite First, Scenario Matrix, Feature-Complete)
-- [ ] Runner configured (see Runner Configuration Checklist)
-
-## Runner Configuration Checklist
-
-**Before running any tests** (`kinhin setup` checks all of these; `kinhin setup --install` installs missing deps):
-
-- [ ] Parallel execution enabled
-- [ ] No-bail enabled (never stop at first failure)
-- [ ] Randomized order enabled
-- [ ] Structured reporter configured (JSON output)
-- [ ] Changed-set selection tool configured
-- [ ] Randomization seed persisted for reproduction
-
 ## Test Generation Checklist
 
 **For each test generated:**
@@ -96,11 +73,10 @@
 - [ ] Implementation makes tests pass (green)
 - [ ] No additional untested functionality added
 
-### Dependency Order
-- [ ] Data models implemented first
-- [ ] Core utilities implemented second
-- [ ] Business logic implemented third
-- [ ] Integration layers implemented fourth
+### Dependency Order (wiring first, tdd-spec → Dependency Implementation Order)
+- [ ] Wiring skeleton (thinnest end-to-end path, fixtures copied from the codebase) implemented first
+- [ ] Data models, core utilities and business logic filled in after it
+- [ ] Stubs replaced by real modules with the skeleton tests still passing
 - [ ] Error handling implemented last
 
 ### Code Quality
@@ -121,7 +97,7 @@
 - [ ] Each surviving permanent test has a `ref` or documented reason
 - [ ] Mutation pass run on changed files (K₁ ⊇ K₀ verified)
 - [ ] PR census line written: `+written N / −pruned M / survivors: X decision, Y contract, Z incident`
-- [ ] Prune changes are in a separate commit from implementation
+- [ ] Prune changes are separate from implementation (in the runner, the runner commits; the agent never runs git)
 
 ## Post-Implementation Checklist
 
@@ -143,7 +119,6 @@
 - [ ] Static analysis passing
 - [ ] Performance requirements met
 - [ ] No hallucination patterns detected
-- [ ] Code review completed
 
 ## Integration Checklist
 
@@ -198,20 +173,6 @@
 - [ ] Fixture purposes documented
 - [ ] Special test configurations documented
 
-## Final Validation Checklist
-
-**Before considering TDD complete:**
-
-- [ ] All pre-TDD checklist items completed
-- [ ] All test generation checklist items completed
-- [ ] All test suite completeness items validated
-- [ ] All code coverage requirements met (at GREEN)
-- [ ] All post-implementation validation passed
-- [ ] All category-specific checklists completed
-- [ ] Prune pass complete
-- [ ] Code review approved
-- [ ] CI/CD pipeline passing
-
 ## Quick Reference
 
 ### Red Flags (Stop if Found)
@@ -230,49 +191,3 @@
 - ❌ Tests pass only in file order
 - ❌ Retry-until-green in CI
 - ❌ Survivors assert mock call counts
-
-### Green Flags (Good Signs)
-- ✅ Tests generated in batches
-- ✅ Comprehensive scenario matrix
-- ✅ Strong, specific assertions
-- ✅ Property tests for invariants
-- ✅ Clear test names and docstrings
-- ✅ Explicit test data
-- ✅ Minimal mocking
-- ✅ Fast test execution
-- ✅ Tests serve as documentation
-- ✅ Easy to add new tests
-- ✅ Scaffold deleted before PR
-- ✅ One table-driven test per function
-- ✅ Randomized order with printed seed
-
-## Workflow-Specific Checklists
-
-### For Test Suite First Workflow
-- [ ] Complete test suite structure designed
-- [ ] All test categories identified
-- [ ] Batch test generation planned
-- [ ] Dependency order mapped
-- [ ] Prune pass planned after implementation
-
-### For Scenario Matrix Workflow
-- [ ] Matrix completely filled
-- [ ] All combinations identified
-- [ ] Test generation from matrix automated
-- [ ] Matrix coverage validated
-- [ ] Prune pass planned after implementation
-
-### For Feature-Complete Workflow
-- [ ] Feature specification complete
-- [ ] All components identified
-- [ ] Integration points mapped
-- [ ] End-to-end workflows documented
-- [ ] Prune pass planned after implementation
-
-## References
-
-- TDD Spec: `@~/.claude/kinhin/spec/tdd/tdd-spec.md`
-- Implementation Guide: `@~/.claude/kinhin/context/guides/tdd-implementation-guide.md`
-- Anti-Patterns: `@~/.claude/kinhin/context/examples/tdd-anti-patterns.md`
-- Prune Guide: `@~/.claude/kinhin/context/guides/tdd-prune-guide.md`
-- Runner Guide: `@~/.claude/kinhin/context/guides/tdd-runner-guide.md`

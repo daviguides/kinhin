@@ -60,23 +60,25 @@ Use consistent patterns and templates.
 Include all scenarios from scenario matrix.
 ```
 
-#### Step 3: Dependency-Ordered Implementation
+#### Step 3: Dependency-Ordered Implementation (Wiring First)
 
-**Implementation Order:**
-1. Data models and types
-2. Core utility functions
-3. Business logic functions
-4. Integration layers
-5. Error handling and validation
+**Implementation Order** (tdd-spec → Dependency Implementation Order):
+1. Wiring skeleton: thinnest end-to-end path, stubs for missing modules, fixtures copied from the codebase for external boundaries
+2. Data models and types
+3. Core utility functions
+4. Business logic functions
+5. Replace stubs with real modules (skeleton tests keep passing)
+6. Error handling and validation
 
 **Prompt Template:**
 ```
 Implement [COMPONENT_CATEGORY] to satisfy tests in tests/test_[CATEGORY].py:
 
 Implementation order:
-1. [DEPENDENCY_1]
-2. [DEPENDENCY_2]
-3. [MAIN_COMPONENT]
+1. [WIRING_SKELETON]
+2. [DEPENDENCY_1]
+3. [DEPENDENCY_2]
+4. [MAIN_COMPONENT]
 
 Generate all implementations in this category simultaneously.
 Ensure all tests pass before moving to next category.
@@ -285,13 +287,14 @@ Implement complete feature: [FEATURE_NAME]
 Test Suite: tests/[feature]/
 Specification: [PASTE_SPEC]
 
-Implement in dependency order:
-1. Data models (User, Session, AuthToken)
-2. Core functions (password hashing, token generation)
-3. Authentication functions (login, logout, register)
-4. Validation functions (validate_session, validate_token)
-5. Integration layers (database, email, audit)
-6. Error handling and recovery
+Implement in dependency order (wiring first):
+1. Wiring skeleton (request → login → session → database, stubs for the rest)
+2. Data models (User, Session, AuthToken)
+3. Core functions (password hashing, token generation)
+4. Authentication functions (login, logout, register)
+5. Validation functions (validate_session, validate_token)
+6. Replace stubs with real integrations (database, email, audit)
+7. Error handling and recovery
 
 Generate all implementations simultaneously.
 Ensure all tests pass before completion.

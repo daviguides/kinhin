@@ -4,23 +4,6 @@
 
 Code and test are a closed system: neither validates the other without a reference point outside both. Every test either names an authority outside that system — a documented decision, an external contract, a production incident — or it does not. The tag on a test is a pointer to that authority, not a label of intent.
 
-## Philosophy
-
-Test-Driven Development optimized for Large Language Models leverages LLM strengths while mitigating weaknesses:
-
-**LLM Strengths:**
-- Parallel thinking and batch processing
-- Template consistency and pattern following
-- Comprehensive scenario generation
-- Property-based validation
-
-**LLM Weaknesses (Mitigated):**
-- Sequential limitations → Batch processing
-- Hallucinations → Anti-hallucination patterns
-- Context fragmentation → Template-driven consistency
-- Test accumulation → Lifecycle tagging
-- Serial feedback → Runner contract
-
 ## Core Principles
 
 ### Batch Processing Over Sequential
@@ -452,30 +435,11 @@ The default dependency order (types → utils → logic → integration → erro
 1. Write tests (tagged at birth)
 2. Run tests → RED (record evidence)
 3. Implement → GREEN
-4. Run validation.sh --block N
+4. Run `bash validation.sh <worktree> <N>` for the block
 5. Fix if fails (≤2 rounds, per arché anti-babysitting)
-6. Commit
+6. Commit (in the runner, the runner commits after the mode; the agent never runs git)
 
 **Benefit**: Clear roadmap and comprehensive coverage.
-
-## Parallel Test Generation
-
-### Functional Grouping
-**Requirement**: Group related functionality for batch generation.
-
-**Structure:**
-```
-Test Groups:
-  authentication: [login, logout, register, validate_session]
-  user_management: [create_user, update_user, delete_user]
-  data_processing: [validate_input, transform_data, save_data]
-```
-
-**Implementation:**
-- Generate all tests for group simultaneously
-- Implement all functions in group together
-- Refactor entire group for consistency
-- Prune the group: collapse scaffolds, promote decisions
 
 ## Coverage Requirements (Construction-Time, Measured at GREEN)
 
@@ -543,51 +507,6 @@ Emit failures as structured data: test ID, assertion operands as values (not pre
 **Cause clustering**: Group failures by `(innermost project-owned frame, exception type)`. If 40 tests fail because one fixture broke, the assistant sees "1 root cause, 40 dependents" — not 40 tracebacks. Fix one cluster at a time, largest first, then rerun the affected set.
 
 Output token budget: cap per cluster, strip passing tests. The assistant's context is the scarce resource; the runner should treat it like one.
-
-## Quality Metrics
-
-### Required Coverage (at GREEN)
-- **Scenario coverage**: 100%
-- **Branch coverage**: ≥ 90%
-- **Property coverage**: 100% of constraints
-- **Integration coverage**: 100% of interactions
-
-### Required Retention (after PRUNE)
-- **Mutation parity**: K₁ ⊇ K₀
-- **Tag completeness**: 0 untagged tests
-- **Permanent survival**: 100% of decision/contract/incident tests
-
-### Validation Checklist
-- [ ] All functions tested
-- [ ] All scenarios covered
-- [ ] All constraints validated
-- [ ] All integrations tested
-- [ ] No hallucination risks identified
-- [ ] Performance validated (if applicable)
-- [ ] Type safety confirmed
-- [ ] Every test tagged
-- [ ] Prune pass done
-- [ ] Runner has no bail
-
-## Integration with Code Standards
-
-### Style Consistency
-**Requirement**: Tests follow same style rules as production code.
-
-**Application:**
-- Same formatting rules
-- Same naming conventions
-- Same documentation standards
-- Same linting rules
-
-### Documentation Standards
-**Requirement**: Tests must be documented.
-
-**Required:**
-- Module docstrings for test files
-- Function docstrings for complex tests
-- Inline comments for non-obvious assertions
-- Test data documentation
 
 ## Workflows
 

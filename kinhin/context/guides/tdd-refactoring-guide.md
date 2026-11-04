@@ -4,16 +4,11 @@
 
 Specialized guide for refactoring code using TDD methodology. Focuses on preserving behavior while improving code structure, with comprehensive test coverage ensuring safety.
 
+Workflows: `tdd-spec.md` → Workflows (Test Suite First: ensure coverage, then refactor; Feature-Complete for large refactorings, treated as re-implementation).
+
 ## Core Principle
 
 **"Refactoring under green tests"**: Never refactor without comprehensive passing tests. Tests are your safety net.
-
-## Recommended Workflow
-
-**Primary**: Test Suite First (Workflow 1) - Ensure coverage, then refactor
-**For Large Refactorings**: Feature-Complete (Workflow 3) - Treat as re-implementation
-
-Reference: `@~/.claude/kinhin/context/guides/tdd-implementation-guide.md`
 
 ## Refactoring Process
 
@@ -28,20 +23,6 @@ Reference: `@~/.claude/kinhin/context/guides/tdd-implementation-guide.md`
 4. Identify refactoring targets and goals
 5. Document current behavior
 
-**Prompt Template:**
-```
-Assess code for refactoring readiness: [COMPONENT_PATH]
-
-Analyze:
-1. Current test coverage: [check coverage report]
-2. Test gaps: [identify untested code paths]
-3. Current behavior: [document what code does]
-4. Refactoring goals: [what to improve]
-5. Risk assessment: [what could break]
-
-Provide assessment before proceeding with refactoring.
-```
-
 ### Phase 2: Test Coverage Completion
 
 **Objective**: Fill any gaps in test coverage before refactoring.
@@ -55,24 +36,6 @@ Provide assessment before proceeding with refactoring.
 - All error paths tested
 - All integrations tested
 
-**Prompt Template:**
-```
-Complete test coverage for: [COMPONENT_PATH]
-
-Current coverage: [X%]
-Target coverage: 100% for refactoring safety
-
-Generate missing tests for:
-1. Untested code paths: [list]
-2. Untested branches: [list]
-3. Untested edge cases: [list]
-4. Untested error paths: [list]
-5. Untested integrations: [list]
-
-Generate all missing tests simultaneously.
-Ensure all tests pass before proceeding with refactoring.
-```
-
 ### Phase 3: Behavior Preservation Tests
 
 **Objective**: Create tests that explicitly validate current behavior.
@@ -85,116 +48,11 @@ Ensure all tests pass before proceeding with refactoring.
 - **Side Effect Tests**: Validate all side effects
 - **Integration Tests**: Validate interactions with other components
 
-**Prompt Template:**
-```
-Create behavior preservation tests for: [COMPONENT]
-
-Current behavior to preserve:
-- Inputs: [list all input scenarios]
-- Outputs: [expected outputs]
-- State changes: [what state changes occur]
-- Side effects: [what side effects occur]
-- Integrations: [how it interacts with other code]
-
-Generate tests that explicitly validate all current behavior.
-These tests must pass both before and after refactoring.
-```
-
 ### Phase 4: Refactoring Implementation
 
 **Objective**: Improve code structure while keeping all tests passing.
 
-**Refactoring Types:**
-
-#### Extract Function
-**When**: Long functions, repeated code, complex logic
-```
-Extract function from: [COMPONENT]
-
-Original function: [FUNCTION_NAME]
-Code to extract: [lines X-Y]
-
-Refactoring:
-1. Extract to new function: [NEW_FUNCTION_NAME]
-2. Replace original code with call to new function
-3. Add tests for extracted function
-4. Verify all existing tests still pass
-
-Generate refactored code.
-```
-
-#### Rename for Clarity
-**When**: Unclear names, inconsistent naming
-```
-Rename for clarity in: [COMPONENT]
-
-Renamings:
-- [old_name_1] → [new_name_1]: [reason]
-- [old_name_2] → [new_name_2]: [reason]
-
-Refactoring:
-1. Rename all occurrences
-2. Update docstrings/comments
-3. Update tests if needed
-4. Verify all tests pass
-
-Generate refactored code with clear names.
-```
-
-#### Simplify Conditional Logic
-**When**: Deep nesting, complex conditions
-```
-Simplify conditional logic in: [COMPONENT]
-
-Current logic: [describe current]
-Complexity issues: [deep nesting, unclear conditions, etc.]
-
-Refactoring strategy:
-1. Use guard clauses for early returns
-2. Extract complex conditions to named functions
-3. Flatten nested structures
-4. Use match/case if appropriate
-
-Generate simplified code.
-Verify all tests still pass.
-```
-
-#### Extract Class
-**When**: Class doing too much, cohesion issues
-```
-Extract class from: [ORIGINAL_CLASS]
-
-New class: [NEW_CLASS_NAME]
-Responsibilities to extract: [list]
-Methods to move: [list]
-Data to move: [list]
-
-Refactoring:
-1. Create new class with extracted responsibilities
-2. Move methods and data
-3. Update original class to use new class
-4. Create tests for new class
-5. Verify all existing tests pass
-
-Generate refactored code with new class structure.
-```
-
-#### Reduce Code Duplication (DRY)
-**When**: Repeated code patterns
-```
-Reduce duplication in: [COMPONENT_LIST]
-
-Duplicated code: [describe pattern]
-Occurrences: [list all locations]
-
-Refactoring:
-1. Extract common code to shared function/utility
-2. Replace all occurrences with calls to shared code
-3. Add tests for shared code
-4. Verify all existing tests pass
-
-Generate DRY refactored code.
-```
+**Rules:** every test stays green after each step; no new behavior in the same change. The refactoring moves themselves (extract function/class, rename, guard clauses, remove duplication) are code-quality rules owned by zazen.
 
 ### Phase 5: Post-Refactoring Validation
 
@@ -206,21 +64,6 @@ Generate DRY refactored code.
 3. Verify performance not degraded
 4. Run static analysis (linting, type checking)
 5. Review code quality improvements
-
-**Prompt Template:**
-```
-Validate refactoring of: [COMPONENT]
-
-Run validation:
-1. Test suite status: [all passing?]
-2. Code coverage: [maintained or improved?]
-3. Performance: [maintained or improved?]
-4. Static analysis: [passing?]
-5. Quality metrics: [improved?]
-
-Provide validation report.
-If any validation fails, identify and fix issue.
-```
 
 ### Phase 6: Prune
 
@@ -236,7 +79,7 @@ If any validation fails, identify and fix issue.
 4. **Mutation pass**: Run mutation testing on changed files. Compare killed mutants before prune (K₀) vs after (K₁). Require K₁ ⊇ K₀. Any mutant that escapes means something load-bearing was pruned — restore or write the decision test it implies.
 5. **PR census line**: Report `written N / pruned M / survivors: X decision, Y contract, Z incident`.
 
-**Prune is a separate commit** from the refactoring itself. The reviewer sees what was deleted and why.
+**Prune is a separate change** from the refactoring itself (in the runner, the agent never commits: the runner commits after the mode). The reviewer sees what was deleted and why.
 
 ---
 
@@ -260,26 +103,7 @@ If any validation fails, identify and fix issue.
 - Continuous code improvement
 - Can be done during feature development
 
-**Approach:**
-```
-Incremental refactoring plan for: [COMPONENT]
-
-Changes (in order):
-1. [Small change 1]: [description]
-   - Make change
-   - Run tests
-   - Verify pass
-2. [Small change 2]: [description]
-   - Make change
-   - Run tests
-   - Verify pass
-3. [Small change 3]: [description]
-   - Make change
-   - Run tests
-   - Verify pass
-
-Each change must keep tests green.
-```
+**Approach:** an ordered list of small changes; after each one, run the tests and keep them green.
 
 ### Large-Scale Refactoring
 
@@ -295,133 +119,6 @@ Each change must keep tests green.
 5. Switch to new architecture
 6. Remove old architecture
 
-**Prompt Template:**
-```
-Large-scale refactoring: [COMPONENT/SYSTEM]
-
-Current architecture: [describe]
-Target architecture: [describe]
-Migration strategy: [describe]
-
-Phase 1: Comprehensive behavior tests
-Generate tests covering 100% of current behavior.
-
-Phase 2: New architecture implementation
-Implement new architecture parallel to old.
-
-Phase 3: Migration
-Migrate functionality incrementally with tests passing throughout.
-
-Phase 4: Cutover
-Switch to new architecture, verify all tests pass.
-
-Phase 5: Cleanup
-Remove old architecture.
-
-Generate refactoring plan and implementation.
-```
-
-## Common Refactoring Patterns
-
-### 1. Extract Method
-**Before:**
-```python
-def process_order(order: Order) -> OrderResult:
-    """Process customer order."""
-    # Validation (10 lines)
-    # Calculation (15 lines)
-    # Database save (8 lines)
-    # Notification (7 lines)
-```
-
-**After:**
-```python
-def process_order(order: Order) -> OrderResult:
-    """Process customer order."""
-    validate_order(order)
-    total = calculate_order_total(order)
-    save_order_to_database(order, total)
-    send_order_notification(order)
-    return OrderResult(success=True)
-```
-
-### 2. Guard Clauses
-**Before:**
-```python
-def calculate_discount(user: User, amount: Decimal) -> Decimal:
-    """Calculate discount."""
-    if user.is_active:
-        if user.subscription_type == "premium":
-            if amount > 100:
-                return amount * Decimal("0.10")
-```
-
-**After:**
-```python
-def calculate_discount(user: User, amount: Decimal) -> Decimal:
-    """Calculate discount."""
-    if not user.is_active:
-        return Decimal("0")
-
-    if user.subscription_type != "premium":
-        return Decimal("0")
-
-    if amount <= 100:
-        return Decimal("0")
-
-    return amount * Decimal("0.10")
-```
-
-### 3. Magic Numbers to Constants
-**Before:**
-```python
-def calculate_fee(amount: Decimal) -> Decimal:
-    if amount > 1000:
-        return amount * 0.02
-    return amount * 0.05
-```
-
-**After:**
-```python
-LARGE_TRANSACTION_THRESHOLD = Decimal("1000")
-LARGE_TRANSACTION_FEE_RATE = Decimal("0.02")
-STANDARD_FEE_RATE = Decimal("0.05")
-
-def calculate_fee(amount: Decimal) -> Decimal:
-    """Calculate transaction fee based on amount."""
-    if amount > LARGE_TRANSACTION_THRESHOLD:
-        return amount * LARGE_TRANSACTION_FEE_RATE
-    return amount * STANDARD_FEE_RATE
-```
-
-## Refactoring Safety Checklist
-
-Before refactoring:
-- [ ] Test coverage ≥ 90% for code being refactored
-- [ ] All tests passing
-- [ ] Behavior preservation tests created
-- [ ] Refactoring goal clearly defined
-
-During refactoring:
-- [ ] Making incremental changes
-- [ ] Running tests after each change
-- [ ] All tests remain passing
-- [ ] No new functionality added
-
-After refactoring:
-- [ ] All tests still passing
-- [ ] Code coverage maintained or improved
-- [ ] Performance maintained or improved
-- [ ] Static analysis passing
-- [ ] Code quality improved
-- [ ] Documentation updated
-
-After prune:
-- [ ] Characterization tests deleted or graduated with a stated reason
-- [ ] Every surviving test tagged with `@decision`, `@contract`, or `@incident`
-- [ ] Mutation parity verified (K₁ ⊇ K₀)
-- [ ] Prune is a separate commit
-
 ## Common Pitfalls
 
 ### Refactoring Without Tests
@@ -430,7 +127,7 @@ After prune:
 
 ### Combining Refactoring with New Features
 **Problem**: Hard to debug issues, mixing concerns.
-**Solution**: Separate refactoring commits from feature commits.
+**Solution**: Keep refactoring and feature work in separate changes (separate blocks or tasks).
 
 ### Large Batch Refactorings
 **Problem**: Hard to review, high risk, difficult to debug.
@@ -447,76 +144,3 @@ After prune:
 ### Keeping Every Characterization Test
 **Problem**: Characterization tests written to snapshot current behavior before a refactoring outlive the refactoring and become permanent bloat. They test the implementation shape, not decisions, and break on every future refactor — generating maintenance cost with no regression value.
 **Solution**: Phase 6 (Prune). Every characterization test must be explicitly graduated with a reason or deleted. The default is deletion.
-
-## Refactoring Triggers
-
-### When to Refactor
-
-**Code Smells:**
-- Long functions (>50 lines)
-- Deep nesting (>3 levels)
-- Duplicated code
-- Unclear names
-- Magic numbers
-- God classes (too many responsibilities)
-- Long parameter lists (>4 parameters)
-
-**Technical Debt:**
-- Hard to understand code
-- Hard to test code
-- Hard to modify code
-- Performance issues
-- Inconsistent patterns
-
-**Boy Scout Rule:**
-"Leave code better than you found it" - refactor opportunistically.
-
-## Integration with Zen Principles
-
-### Refactoring Goals Aligned with Zen
-
-- **Readability Counts**: Make code more readable
-- **Explicit > Implicit**: Make intentions clearer
-- **Simple > Complex**: Simplify logic
-- **Flat > Nested**: Reduce nesting
-- **Beautiful > Ugly**: Improve aesthetics
-
-### Refactoring Prompt with Zen
-
-```
-Refactor [COMPONENT] following Zen of Python:
-
-Current issues:
-- [Issue 1]: Violates [Zen Principle]
-- [Issue 2]: Violates [Zen Principle]
-
-Refactoring goals:
-1. Improve readability
-2. Make intentions explicit
-3. Simplify complex logic
-4. Flatten nested structures
-5. Follow established patterns
-
-Generate refactored code adhering to Zen principles.
-Ensure all tests pass.
-```
-
-## Success Metrics
-
-Refactoring is successful when:
-- [ ] All tests passing
-- [ ] Code coverage maintained/improved
-- [ ] Code quality metrics improved
-- [ ] Performance maintained/improved
-- [ ] Readability improved (team consensus)
-- [ ] Easier to understand
-- [ ] Easier to modify
-- [ ] Easier to test
-- [ ] Technical debt reduced
-
-## References
-
-- Main Workflows: `@~/.claude/kinhin/context/guides/tdd-implementation-guide.md`
-- TDD Checklist: `@~/.claude/kinhin/context/checklists/tdd-checklist.md`
-- Zen Principles: `@~/.claude/kinhin/spec/principles/zen-principles-spec.md`
-- Test Templates: `@~/.claude/kinhin/context/examples/tdd-unit-tests.md`

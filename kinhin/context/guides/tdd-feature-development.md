@@ -1,15 +1,6 @@
 # TDD Feature Development Guide
 
-## Overview
-
-Specialized guide for developing new features from scratch using TDD. Focuses on comprehensive test coverage before implementation.
-
-## Recommended Workflow
-
-**Primary**: Feature-Complete TDD (Workflow 3)
-**Alternative**: Test Suite First (Workflow 1) for smaller features
-
-Reference: `@~/.claude/kinhin/context/guides/tdd-implementation-guide.md`
+New features from scratch: full scope and scenarios before any code. Workflows: `tdd-spec.md` → Workflows (Feature-Complete for most features, Test Suite First for small ones).
 
 ## Feature Development Process
 
@@ -25,22 +16,6 @@ Reference: `@~/.claude/kinhin/context/guides/tdd-implementation-guide.md`
 5. Identify all integrations with external systems
 6. Define all error scenarios
 
-**Prompt Template:**
-```
-Create feature specification for: [FEATURE_NAME]
-
-Include:
-- Components list with responsibilities
-- Function signatures with type hints
-- Data model definitions
-- Security constraints
-- Performance requirements
-- External integrations
-- Error scenarios
-
-Generate comprehensive specification.
-```
-
 ### Phase 2: Scenario Matrix Creation
 
 **Objective**: Identify all test scenarios before implementation.
@@ -51,18 +26,6 @@ Generate comprehensive specification.
 - **Error Cases**: Invalid inputs, system failures, constraint violations
 - **Performance**: Load handling, response times, resource usage
 - **Security**: Authentication, authorization, data protection
-
-**Prompt Template:**
-```
-Create scenario matrix for feature: [FEATURE_NAME]
-
-For each component in [COMPONENT_LIST]:
-| Component | Happy Path | Edge Case | Error Case | Performance | Security |
-|-----------|------------|-----------|------------|-------------|----------|
-| [COMP_1]  | [scenarios]| [scenarios]| [scenarios]| [criteria]  |[checks]  |
-
-Generate complete matrix covering all scenarios.
-```
 
 ### Phase 3: Test Suite Generation
 
@@ -80,23 +43,6 @@ tests/[feature_name]/
 └── test_security.py         # Security validation
 ```
 
-**Prompt Template:**
-```
-Generate complete test suite for feature: [FEATURE_NAME]
-
-Scenario matrix: [PASTE_MATRIX]
-Specification: [PASTE_SPEC]
-
-Generate test files:
-1. test_unit.py - All unit tests for core logic
-2. test_integration.py - All integration tests
-3. test_e2e.py - Complete user workflows
-4. test_performance.py - Performance requirements
-5. test_security.py - Security validations
-
-Generate all test files simultaneously with complete implementations.
-```
-
 ### Phase 4: Implementation — Wiring First
 
 **Objective**: Implement the wiring skeleton first, then fill in modules.
@@ -111,49 +57,13 @@ See `tdd-spec.md` → *Dependency Implementation Order* → *Wiring First*.
 5. **Replace Stubs** - Swap stubs with real modules (skeleton tests keep passing)
 6. **Error Handling** - Add comprehensive error handling
 
-**Prompt Template:**
-```
-Implement feature [FEATURE_NAME] in dependency order:
+### Phase 5: Validation
 
-Tests to satisfy: tests/[feature_name]/
-
-Implementation order:
-1. Data Models: [list models]
-2. Core Utilities: [list utilities]
-3. Business Logic: [list core functions]
-4. Integration Layers: [list integrations]
-5. API/Interface: [list endpoints/interfaces]
-6. Error Handling: [list error scenarios]
-
-Generate implementations for phase [N] ensuring all related tests pass.
-```
-
-### Phase 5: Validation and Refinement
-
-**Objective**: Ensure all tests pass and coverage is complete.
-
-**Validation Checklist:**
-- [ ] All unit tests pass
-- [ ] All integration tests pass
-- [ ] All e2e tests pass
-- [ ] Performance requirements met
-- [ ] Security validations pass
-- [ ] Code coverage ≥ 90%
-- [ ] No untested edge cases
-- [ ] All constraints validated
+Coverage at GREEN: `tdd-spec.md` → Coverage Requirements.
 
 ### Phase 6: Prune
 
-**Objective**: Remove construction-time tests, keep only what protects against future regression.
-
-**Steps:**
-1. **Tag census**: Every test should already be tagged from Phases 2–4. List tests by tag.
-2. **Collapse scaffolds**: Where multiple `@scaffold` tests cover the same function, collapse into one table-driven `@decision` test with representative inputs per equivalence class + boundaries.
-3. **Delete remaining scaffolds**: Tests that are subsets of surviving tests, assert implementation shape, or have no stated authority — delete.
-4. **Mutation parity**: Run mutation testing on changed files. K₁ (post-prune killed set) ⊇ K₀ (pre-prune killed set). Any escaping mutant means something load-bearing was pruned — restore or write the decision test it implies.
-5. **PR census line**: `written N / pruned M / survivors: X decision, Y contract, Z incident`.
-
-**Prune is a separate commit** from the feature implementation.
+`tdd-spec.md` → Test Lifecycle (prune criteria, collapse pattern, mutation parity) and Retention Requirements. In the runner, the agent never commits: the runner commits after the mode.
 
 ---
 
@@ -190,125 +100,3 @@ Generate implementations for phase [N] ensuring all related tests pass.
 3. Use scenario matrix for complex components
 4. Use standard test suite for straightforward components
 5. Implement in dependency order with validation gates
-
-## Prompt Engineering Strategies
-
-### For Comprehensive Coverage
-
-```
-Generate test suite with COMPREHENSIVE coverage for [FEATURE]:
-
-Coverage Requirements:
-- 100% of scenario matrix cells tested
-- All business constraints have property tests
-- All integrations have integration tests
-- All error paths have error tests
-- All performance criteria have performance tests
-
-Use batch generation:
-- Generate all tests in category simultaneously
-- Use consistent templates
-- Apply AAA pattern
-- Include type hints and docstrings
-
-Validate anti-hallucination:
-- Explicit assertions for all expected behavior
-- No implicit conversions
-- Clear error messages
-- Documented assumptions
-```
-
-### For Dependency Management
-
-```
-Implement [FEATURE] respecting dependencies:
-
-Dependency Graph:
-[MODEL_A] → [UTILITY_B] → [LOGIC_C] → [INTEGRATION_D]
-
-Implementation Order:
-1. Implement [MODEL_A] (no dependencies)
-2. Implement [UTILITY_B] (depends on MODEL_A)
-3. Implement [LOGIC_C] (depends on UTILITY_B)
-4. Implement [INTEGRATION_D] (depends on LOGIC_C)
-
-For each step:
-- Run related tests
-- Verify all pass
-- Proceed to next dependency level
-
-Generate implementations respecting dependency order.
-```
-
-### For Performance Requirements
-
-```
-Implement [FEATURE] with performance validation:
-
-Performance Requirements:
-- [Requirement 1]: [criterion]
-- [Requirement 2]: [criterion]
-- [Requirement 3]: [criterion]
-
-Include performance tests:
-- Measure actual performance
-- Validate meets requirements
-- Test under load
-- Test resource usage
-
-Generate implementation optimized for performance requirements.
-```
-
-## Common Pitfalls
-
-### Incomplete Specification
-**Problem**: Starting implementation before fully understanding requirements.
-**Solution**: Complete Phase 1 (Feature Specification) thoroughly before proceeding.
-
-### Missing Edge Cases
-**Problem**: Only testing happy path scenarios.
-**Solution**: Use scenario matrix to systematically identify all edge cases.
-
-### Sequential Implementation
-**Problem**: Implementing one function at a time.
-**Solution**: Batch implementation by dependency level.
-
-### Insufficient Integration Tests
-**Problem**: Only unit testing, missing integration issues.
-**Solution**: Include dedicated integration test file with all component interactions.
-
-### Performance Afterthought
-**Problem**: Discovering performance issues late.
-**Solution**: Include performance tests from the beginning, validate throughout.
-
-## Success Criteria
-
-Feature development is complete when:
-- [ ] Feature specification documented
-- [ ] Scenario matrix complete
-- [ ] All test files created and passing
-- [ ] All components implemented
-- [ ] Code coverage ≥ 90% (at GREEN, construction-time)
-- [ ] Prune pass complete: scaffolds collapsed or deleted, every survivor tagged with reason
-- [ ] Mutation parity verified (K₁ ⊇ K₀)
-- [ ] PR census line: `written N / pruned M / survivors: X decision, Y contract, Z incident`
-- [ ] Performance requirements met
-- [ ] Security validations pass
-- [ ] Integration tests pass
-- [ ] E2E workflows work correctly
-- [ ] Documentation updated
-- [ ] No known bugs or issues
-
-## Next Steps After Feature Complete
-
-1. **Code Review**: Review against TDD checklist
-2. **Documentation**: Update user and technical documentation
-3. **Integration**: Integrate with existing codebase
-4. **Deployment**: Follow deployment procedures
-5. **Monitoring**: Set up monitoring for new feature
-
-## References
-
-- Main Workflows: `@~/.claude/kinhin/context/guides/tdd-implementation-guide.md`
-- TDD Checklist: `@~/.claude/kinhin/context/checklists/tdd-checklist.md`
-- Test Templates: `@~/.claude/kinhin/context/examples/tdd-unit-tests.md`

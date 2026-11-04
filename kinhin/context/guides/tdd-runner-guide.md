@@ -2,9 +2,7 @@
 
 ## Overview
 
-How to configure and use test runners for code-assistant batch workflows. The universal spec defines a 6-point runner contract (`@~/.claude/kinhin/spec/tdd/tdd-spec.md` → Runner Contract). This guide maps the contract to concrete tools and recipes.
-
-**With the CLI:** `kinhin run --mode loop|full|diagnostic` wraps your runner with the correct flags automatically. `kinhin setup` checks and installs required runner plugins. Without the CLI, configure manually as described below.
+How to use test runners for code-assistant batch workflows. The universal spec defines a 6-point runner contract (`tdd-spec.md` → Runner Contract); per-language configuration is in each `<lang>-tdd-spec`. This guide covers the run modes and cause clustering. CLI: `tdd-spec.md` → CLI Tools.
 
 
 ## Three Run Modes
@@ -23,23 +21,6 @@ Every Kinhin workflow uses three modes at different points:
 
 **Purpose**: fast feedback. Typically < 60 seconds.
 
-```bash
-# Python
-pytest --testmon -n auto -p randomly --maxfail=0
-
-# Rust
-cargo nextest run -p <changed_crate> --no-fail-fast
-
-# Java (Gradle)
-gradle :changed-module:test --continue
-
-# TypeScript (Jest)
-jest --findRelatedTests src/changed-file.ts --no-bail --maxWorkers=50%
-
-# TypeScript (Vitest)
-vitest run --changed --reporter=json
-```
-
 ### Full Mode (Pre-PR Gate)
 
 **When**: before opening a PR, after all changes are complete.
@@ -52,23 +33,6 @@ vitest run --changed --reporter=json
 
 **Purpose**: catch cross-module regressions. Selection NEVER replaces this.
 
-```bash
-# Python
-pytest -m "not scaffold" -n auto -p randomly --maxfail=0
-
-# Rust
-cargo nextest run --filter-expr 'not test(scaffold::)' --profile ci
-
-# Java
-mvn test  # with <excludedGroups>scaffold</excludedGroups>
-
-# TypeScript (Jest)
-jest --testPathIgnorePatterns scaffold --no-bail --randomize
-
-# TypeScript (Vitest)
-vitest run --exclude "**/**.scaffold.test.ts"
-```
-
 ### Diagnostic Mode (Flake Isolation)
 
 **When**: a test fails intermittently and needs classification.
@@ -80,80 +44,18 @@ vitest run --exclude "**/**.scaffold.test.ts"
 
 **Purpose**: determine if the failure is deterministic, isolation-dependent, or flaky.
 
+Commands for loop, full and diagnostic runs live in each `<lang>-tdd-spec` → Runner Configuration. Two the language specs do not carry:
+
 ```bash
-# Python
-pytest tests/test_suspect.py::test_name -p no:randomly -x
-
-# Rust
-cargo nextest run --filter-expr 'test(suspect_test)' -j 1
-
-# Java
+# Java — diagnostic (serial, one test)
 mvn test -Dtest=SuspectTest#methodName -Djunit.jupiter.execution.parallel.enabled=false
 
-# TypeScript
+# TypeScript (Jest) — diagnostic, then rerun with the original seed
 jest --testNamePattern "suspect test" --runInBand
-```
-
-
-## Three-Run Flake Protocol
-
-When a test fails in the full run, classify it before acting:
-
-```
-STEP 1: Rerun the failure ISOLATED (fresh process, alone)
-        Run it 3 times.
-        ┌─ All 3 fail    → DETERMINISTIC-FAIL
-        │                   Action: fix the code or the test.
-        │
-        └─ Any pass       → Go to Step 2.
-
-STEP 2: Rerun WITH the original order and seed
-        (reproduces the original environment)
-        ┌─ Fails          → ISOLATION-DEPENDENT
-        │                   Action: shared state bug. Fix NOW.
-        │                   This is not a flake — it's a real bug
-        │                   that only shows under concurrency.
-        │
-        └─ Passes         → FLAKY
-                            Action: quarantine with a ticket.
-                            Never retry-until-green.
-                            Never mark as "known flaky" and ignore.
-```
-
-### Concrete Commands
-
-**Python:**
-```bash
-# Step 1: isolated, 3 times
-pytest tests/test_file.py::test_name --count=3 -p no:randomly -p no:xdist
-
-# Step 2: original environment
-pytest -p randomly --randomly-seed=<SEED> -n auto
-```
-
-**Rust:**
-```bash
-# Step 1: isolated
-cargo nextest run --filter-expr 'test(the_test)' -j 1 --retries 2
-
-# Step 2: with original partition
-cargo nextest run --no-fail-fast
-```
-
-**TypeScript (Jest):**
-```bash
-# Step 1: isolated
-jest --testNamePattern "the test" --runInBand --forceExit
-
-# Step 2: original environment
 jest --no-bail --randomize --seed=<SEED>
 ```
 
-### Why Not Retry-Until-Green
-
-Auto-retry plugins (`pytest-rerunfailures` with `--reruns`, Jest `--retryTimes`) hide exactly the information the assistant needs. A test that passes on retry 2 of 3 is either isolation-dependent (a real bug) or flaky (a test bug). Retrying to green classifies both as "passed" and the bug ships.
-
-Use retry plugins ONLY inside the three-run protocol, never as a CI gate.
+Flake classification (three-run protocol, three verdicts, no retry-until-green): `tdd-spec.md` → Runner Contract #4.
 
 
 ## Cause Clustering
@@ -210,52 +112,3 @@ When the runner only provides text output:
 
 3. Fix the top entry. Rerun.
 
-
-## Structured Output Per Language
-
-### Python — pytest-json-report
-
-```bash
-pytest --json-report --json-report-file=results.json
-```
-
-Key fields: `.tests[].outcome`, `.tests[].call.crash.path`, `.tests[].call.crash.lineno`, `.tests[].call.crash.message`.
-
-### Rust — nextest JUnit XML
-
-```toml
-# .config/nextest.toml
-[profile.ci.junit]
-path = "target/nextest/ci/junit.xml"
-```
-
-Key fields: `<testcase name>`, `<failure message>`, `<failure type>`.
-
-### Java — Surefire XML
-
-Located at `target/surefire-reports/TEST-*.xml`.
-
-Key fields: `<testcase classname="" name="">`, `<failure type="" message="">`, `<error>`.
-
-### TypeScript — Jest JSON
-
-```bash
-jest --json --outputFile=results.json
-```
-
-Key fields: `.testResults[].testResults[].status`, `.testResults[].testResults[].failureMessages`.
-
-### TypeScript — Vitest JSON
-
-```bash
-vitest run --reporter=json --outputFile=results.json
-```
-
-Key fields: `.testResults[].assertionResults[].status`, `.testResults[].assertionResults[].failureMessages`.
-
-
-## References
-
-- Runner Contract: `@~/.claude/kinhin/spec/tdd/tdd-spec.md`
-- Anti-Patterns #20-23 (runner): `@~/.claude/kinhin/context/examples/tdd-anti-patterns.md`
-- Per-language configs: see each language's TDD spec

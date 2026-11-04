@@ -103,8 +103,8 @@ it, and every token in the system prompt is paid on every API call.
 | Entry | Files | Mode |
 |---|---|---|
 | `load-planning` | tdd-spec, tdd-feature-development, tdd-bugfix-guide, tdd-refactoring-guide | PLANNING, PLAN_REVIEWING |
-| `load-implementing` | tdd-spec, tdd-implementation-guide, tdd-lifecycle-tags, tdd-runner-guide, tdd-anti-patterns | IMPLEMENTING |
-| `load-validating` | tdd-checklist, tdd-prune-guide, tdd-runner-guide, tdd-anti-patterns | VALIDATING |
+| `load-implementing` | tdd-spec, tdd-lifecycle-tags, tdd-runner-guide, tdd-anti-patterns | IMPLEMENTING |
+| `load-validating` | tdd-checklist, tdd-runner-guide, tdd-anti-patterns | VALIDATING |
 | `load-python` | python-tdd-spec, tdd-unit/integration/property/error-handling/performance-tests | IMPLEMENTING, VALIDATING |
 | `load-rust` / `load-java` / `load-typescript` | `<lang>-tdd-spec`, `<lang>-tdd-patterns` | IMPLEMENTING, VALIDATING |
 
@@ -119,16 +119,29 @@ Classification notes:
   and validating (flake protocol, full runs).
 - The validator gets the checklist, not `tdd-spec`: the checklist is the
   distilled, checkable form of the spec.
+- `tdd-implementation-guide` (prompt templates for a human driving an
+  LLM; every rule is in tdd-spec) and `tdd-prune-guide` (no runner mode
+  prunes: IMPLEMENTING is never asked to, VALIDATING cannot edit) are
+  interactive-only: in `load.md`, and `/kinhin:prune` reads the prune
+  guide from disk. Not in any runner entry.
+- Per-language content (tag syntax, run commands, flake commands, CI
+  profiles, structured output) lives ONLY in `<lang>-tdd-spec`, which
+  always rides with implementing/validating. Universal files stay
+  language-neutral. Exception: Java/TypeScript diagnostic commands and
+  the TypeScript seed rerun sit in tdd-runner-guide until their specs
+  carry them.
 
-Compiled size (`compile_plugin("kinhin", prompt=<entry>)`, ~chars/3.6):
+Compiled size (`compile_plugin("kinhin", prompt=<entry>)`, ~chars/3.6).
+The compiler reads the INSTALLED bundle (`~/.claude/kinhin`): measure
+after install, or compile a copy of the source under a scratch HOME.
 
 | Entry | Chars | ~Tokens |
 |---|---|---|
-| `load` (union, all languages) | 274,699 | 76.3k |
-| `load-planning` | 64,677 | 18.0k |
-| `load-implementing` | 83,959 | 23.3k |
-| `load-validating` | 48,314 | 13.4k |
-| `load-python` | 72,644 | 20.2k |
+| `load` (union, all languages) | 183,395 | 50.9k |
+| `load-planning` | 42,890 | 11.9k |
+| `load-implementing` | 50,889 | 14.1k |
+| `load-validating` | 27,918 | 7.8k |
+| `load-python` | 17,099 | 4.7k |
 | `load-rust` | 18,797 | 5.2k |
 | `load-java` | 21,174 | 5.9k |
 | `load-typescript` | 19,371 | 5.4k |
