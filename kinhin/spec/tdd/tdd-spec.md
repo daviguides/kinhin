@@ -278,6 +278,18 @@ A test is pruned if **all** hold:
 | Characterization test for refactoring | `@scaffold` | Golden-master dies when the refactor completes |
 | Scenario matrix exploration rows | `@scaffold` | Construction verification, not regression |
 
+### Independent Prune
+
+A tag is the author's claim, written under construction pressure. When the pruner is not the author (the runner's `test-prune` workflow, one prune per milestone), the tag is a hint, not a verdict:
+
+1. A permanent tag (`decision`, `contract`, `incident`) whose `ref` resolves to a live authority (an ADR or doc section that exists, a schema or consumer that exists, an incident ticket) keeps the test.
+2. A permanent tag with no `ref`, or a `ref` that does not resolve, is re-judged against the Graduation Criteria. Meeting none of them, it is scaffold.
+3. An untagged test is judged the same way.
+4. A test cited as evidence in a delivered task's `completeness.md` is never deleted or renamed: the delivery's proof points at it.
+5. What survives is what is pinned to something stable: a boundary contract (schema, external tool format, CLI), a regression of a real bug, an invariant of a pure function, a decision with a live ref.
+
+Never re-tag a test to make its deletion pass: record the reclassification and its reason in the prune report instead.
+
 ### Collapse Pattern
 
 N scaffold rows over one function collapse into **one table-driven test** tagged `@decision`:
@@ -288,9 +300,9 @@ N scaffold rows over one function collapse into **one table-driven test** tagged
 4. The collapsed test inherits the strongest tag among its sources.
 5. Row identifiers appear in assertion messages (ties to Anti-Pattern #8).
 
-### Mutation Parity Protocol
+### Mutation Parity Protocol (optional)
 
-Verification that pruning removed nothing load-bearing:
+Verification that pruning removed nothing load-bearing, when mutation tooling is available. It is not required: the runner's `test-prune` workflow does not run it. Its safety net is deterministic (the suite stays green, evidence-cited tests survive, the owner's coverage policy when one is set) plus a reviewer in a separate session who judges every deletion.
 
 1. Run mutation testing on changed files with the **full pre-prune suite**. Record the killed-mutant set K₀.
 2. Execute the prune.
@@ -424,7 +436,7 @@ The default dependency order (types → utils → logic → integration → erro
 4. Business logic functions
 5. Replace stubs with real modules (skeleton tests keep passing)
 6. Error handling
-7. **Prune**: Tag census, collapse scaffolds, verify mutation parity
+7. **Prune**: Tag census, collapse scaffolds, verify (mutation parity when tooling is available)
 
 **Benefit**: The integration seam is exercised first while context is fresh. Pure modules fill in later and the skeleton catches regressions.
 
@@ -458,13 +470,13 @@ The default dependency order (types → utils → logic → integration → erro
 ## Retention Requirements (Measured After PRUNE)
 
 ### Permanent Test Survival
-**Requirement**: 100% of `@decision`, `@contract`, and `@incident` tests survive the prune.
+**Requirement**: 100% of `@decision`, `@contract`, and `@incident` tests whose `ref` resolves survive the prune, and 100% of tests cited as completeness evidence (see Independent Prune).
 
 ### Tag Completeness
 **Requirement**: 0 untagged tests at merge. Every test is explicitly `@scaffold` (and removed) or carries a permanent tag with a `ref`.
 
-### Mutation Parity
-**Requirement**: Mutation score on changed files after prune ≥ mutation score before prune. K₁ ⊇ K₀.
+### Mutation Parity (optional)
+**Guidance**: When mutation tooling runs, mutation score on changed files after prune ≥ mutation score before prune (K₁ ⊇ K₀). Not a gate.
 
 ### Branch Coverage (Smoke Alarm)
 **Guidance**: Branch coverage on changed code is reported after prune, with 80% as a smoke alarm. A drop below 80% means collapse was too aggressive — restore rows. This is a signal, not a gate.

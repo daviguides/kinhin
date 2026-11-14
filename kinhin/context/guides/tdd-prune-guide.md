@@ -2,13 +2,13 @@
 
 ## Overview
 
-Prune is the fourth phase of the TDD cycle: Red → Green → Refactor → **Prune**. It runs once per deliverable, before merge, as its own commit.
+Prune is the fourth phase of the TDD cycle: Red → Green → Refactor → **Prune**. Interactively it runs once per deliverable, before merge, as its own commit. In the runner it runs once per milestone, as its own task (`workflow: test-prune`), after every other task of the milestone merged: see Independent Prune below.
 
 Prune answers: "which tests were construction scaffolding and which earned permanent status?"
 
 Reference: `@~/.claude/kinhin/spec/tdd/tdd-spec.md` → Test Lifecycle.
 
-**CLI**: `kinhin prune` automates this entire procedure. Use `kinhin prune` for a dry run (shows the plan), `kinhin prune --apply` to execute, `kinhin prune --apply --verify` to execute and run mutation parity. Without the CLI, follow the manual steps below.
+**CLI**: `kinhin prune` automates this entire procedure. Use `kinhin prune` for a dry run (shows the plan), `kinhin prune --apply` to execute, `kinhin prune --apply --verify` to execute and run mutation parity (optional). Without the CLI, follow the manual steps below.
 
 
 ## Procedure
@@ -42,7 +42,7 @@ Record: `total`, `scaffold`, `decision`, `contract`, `incident`, `untagged`.
 
 ### Step 2: Classify Untagged Tests
 
-Every untagged test must be classified with a one-line justification:
+Every untagged test, and every permanent-tagged test whose `ref` is missing or does not resolve, must be classified with a one-line justification (tags are the author's claim; see Independent Prune):
 
 - If it encodes a decision → tag `@decision(reason=...)` and keep
 - If it guards a silent failure → tag `@decision` or `@incident` and keep
@@ -71,11 +71,12 @@ For each function with multiple scaffold tests:
 After collapse, delete tests that:
 - Are still tagged `@scaffold`
 - Were not collapsed into a surviving test
-- Have no unique mutation-killing power (verified in Step 5)
+- Are not cited as evidence in a delivered task's `completeness.md`
+- Have no unique mutation-killing power (when Step 5 runs)
 
-### Step 5: Mutation Parity
+### Step 5: Mutation Parity (optional)
 
-Run mutation testing on changed files to verify nothing load-bearing was pruned.
+When mutation tooling is available, run mutation testing on changed files to verify nothing load-bearing was pruned. It is not required: the runner's `test-prune` workflow does not run it (see Independent Prune for its safety net).
 
 **With the CLI:** `kinhin gate --save-baseline pre.json` (before prune), then `kinhin gate --baseline pre.json` (after).
 
@@ -109,8 +110,45 @@ End the PR description with:
 
 ```
 Tests: written 38 / pruned 29 / survivors: 5 decision, 2 contract, 1 incident, 1 table-driven (9 rows)
-Mutation parity: K₁ ⊇ K₀ ✓
+Mutation parity: K₁ ⊇ K₀ ✓   (only when Step 5 ran)
 ```
+
+
+## Independent Prune (runner `test-prune`)
+
+The instrument appends one prune task to each new milestone, depending on every other task; the runner executes it like any task, on the review pin, in a session separate from the authors. Unit tests are construction scaffolding for the code assistant: after delivery, only tests pinned to something stable remain.
+
+**Keep** (and say which, in the report):
+
+| Category | What it pins | Tag it carries |
+|---|---|---|
+| `contract` | a boundary another party reads: schema, external tool format, CLI output, wire format | `@contract(ref=)` |
+| `regression` | a real bug that happened (incident, ticket, a fix commit) | `@incident(ref=)` |
+| `invariant` | a property of a pure function that holds for all inputs | `@decision` (property) |
+| `decision` | a documented choice whose ref resolves | `@decision(ref=)` |
+| `evidence` | cited by a delivered task's `completeness.md` | unchanged |
+
+**Remove or collapse** everything else: shape assertions (mock call counts, private state), subsets of survivors, scenario-matrix rows (collapse into one table-driven test).
+
+Tags are hints. The author tagged under construction pressure (one suite counted 1356 `decision` against 33 `scaffold`): a permanent tag without a resolving `ref` gets judged like an untagged test.
+
+**Safety net, without mutation testing:**
+1. The suite stays green: `make test` and `make check` for every component.
+2. Evidence preservation: every test a delivered task cited as evidence still exists, same file, same name. The runner checks it before the reviewer.
+3. The owner's coverage policy, when the owner has one (`owners.yaml coverage`): a gate on constrains how much can go.
+4. A reviewer in a separate session judges every deletion against `prune-report.md`.
+
+**`prune-report.md`** (task docs dir): one row per test the milestone's tasks added or changed:
+
+```markdown
+| test | file | category | action | reason |
+|---|---|---|---|---|
+| test_output_matches_schema_v2 | tests/test_cli.py | contract | keep | review_v1 schema consumed by app |
+| test_parse_valid_json | tests/test_parse.py | scaffold | collapse | row `json` of test_parse_formats |
+| test_calls_helper_once | tests/test_flow.py | scaffold | remove | mock call count, shape only |
+```
+
+`action`: keep | remove | collapse. End with the census line (Step 6).
 
 
 ## Worked Example
@@ -167,10 +205,15 @@ Mutation parity: K₁ ⊇ K₀ ✓
 ## Decision Tree
 
 ```
-Is the test tagged @scaffold (or untagged)?
-├── NO → it's permanent. Keep it.
+Is the test cited as evidence in a delivered task's completeness.md?
+├── YES → KEEP. Never delete or rename it.
 │
-└── YES → Does it test implementation shape?
+Does it carry a permanent tag whose ref resolves to a live authority?
+├── YES → it's permanent. Keep it.
+│
+└── NO (scaffold, untagged, or a permanent tag without a resolving ref)
+    │
+    Does it test implementation shape?
     │     (mock call counts, argument order, private state,
     │      render tree, things that change with any refactor)
     │
@@ -178,7 +221,7 @@ Is the test tagged @scaffold (or untagged)?
     │
     └── NO → Is it a subset of a surviving test?
         │     (the surviving test covers the same branch
-        │      AND kills the same mutants)
+        │      and asserts the same outcome)
         │
         ├── YES → DELETE. The survivor carries this.
         │
@@ -202,7 +245,7 @@ Is the test tagged @scaffold (or untagged)?
 
 A contract test "looks redundant" because the implementation obviously matches the spec. But the test's purpose is not to verify today's implementation — it's to detect TOMORROW's accidental change. A contract test is a tripwire, not a proof.
 
-**Rule**: never prune a `@contract` test. Its authority is external.
+**Rule**: never prune a contract test whose party exists: a schema, a consumer, a format someone reads. Its authority is external. A `@contract` tag naming no party is a hint, judged like any other.
 
 ### Mistake 2: Collapsing Away a Boundary Row
 
@@ -214,9 +257,9 @@ An assistant under "execute to completion" pressure may re-tag a `@decision` tes
 
 **Rule**: never downgrade a permanent tag. If the decision changed, update the reason and the ref — don't erase the tag.
 
-### Mistake 4: Pruning Without Mutation Verification
+### Mistake 4: Pruning Without a Safety Net
 
-Deleting tests based on judgment alone ("this one is obviously redundant") skips the objective check. Run mutation parity. If a pruned test was the only thing killing a mutant, your judgment was wrong. Restore it.
+Deleting tests on judgment alone ("this one is obviously redundant") skips the objective check. The net is deterministic: the suite stays green, evidence-cited tests survive, the owner's coverage policy holds, and a second reader (the reviewer) judges each deletion. Mutation parity adds to it when tooling is available; it is not required.
 
 
 ## References

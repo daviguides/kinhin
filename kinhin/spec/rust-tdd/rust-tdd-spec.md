@@ -326,7 +326,7 @@ the type, not a redundant test.
 
 **At GREEN (construction-time):** ≥90% branch on changed code. Scaffolds exist to satisfy this.
 
-**After PRUNE (retention):** mutation parity on changed files (K₁ ⊇ K₀). Branch coverage MAY drop — that is expected after removing scaffolds.
+**After PRUNE (retention):** mutation parity on changed files (K₁ ⊇ K₀) when tooling is available; optional. Branch coverage MAY drop — that is expected after removing scaffolds.
 
 ## Anti-Hallucination (Rust Form)
 

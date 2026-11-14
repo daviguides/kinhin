@@ -107,6 +107,7 @@ it, and every token in the system prompt is paid on every API call.
 | `load-validating` | tdd-checklist, tdd-runner-guide, tdd-anti-patterns | VALIDATING |
 | `load-python` | python-tdd-spec, tdd-unit/integration/property/error-handling/performance-tests | IMPLEMENTING, VALIDATING |
 | `load-rust` / `load-java` / `load-typescript` | `<lang>-tdd-spec`, `<lang>-tdd-patterns` | IMPLEMENTING, VALIDATING |
+| `load-pruning` | tdd-spec, tdd-prune-guide, tdd-lifecycle-tags, tdd-anti-patterns | `test-prune` workflow: IMPLEMENTING (pruner) and VALIDATING (reviewer of the deletions) |
 
 Classification notes:
 - `tdd-spec` sits in planning AND implementing: planning needs authority
@@ -120,10 +121,17 @@ Classification notes:
 - The validator gets the checklist, not `tdd-spec`: the checklist is the
   distilled, checkable form of the spec.
 - `tdd-implementation-guide` (prompt templates for a human driving an
-  LLM; every rule is in tdd-spec) and `tdd-prune-guide` (no runner mode
-  prunes: IMPLEMENTING is never asked to, VALIDATING cannot edit) are
-  interactive-only: in `load.md`, and `/kinhin:prune` reads the prune
-  guide from disk. Not in any runner entry.
+  LLM; every rule is in tdd-spec) is interactive-only: in `load.md`.
+  `tdd-prune-guide` rides only with `load-pruning`: the
+  self-implementation modes never prune. The runner prunes once per
+  milestone, in a `test-prune` task (dao-cli workflow) the instrument
+  appends to each new milestone; pruner and reviewer both load
+  `load-pruning`, in separate sessions. `/kinhin:prune` reads the guide
+  from disk.
+- Prune judges independently: tags are the author's claim (a hint);
+  a permanent tag survives when its `ref` resolves. Tests cited as
+  completeness evidence are never deleted. Mutation parity is optional
+  (the workflow's net is deterministic plus the reviewer).
 - Per-language content (tag syntax, run commands, flake commands, CI
   profiles, structured output) lives ONLY in `<lang>-tdd-spec`, which
   always rides with implementing/validating. Universal files stay

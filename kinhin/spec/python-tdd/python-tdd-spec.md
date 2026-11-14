@@ -169,7 +169,7 @@ pytest --tb=short 2>&1 | grep -E "^(FAILED|E )" | sort | uniq -c | sort -rn
 ### Construction vs Retention
 
 - **At GREEN (construction-time):** ≥90% branch coverage on changed code. Scaffolds exist to satisfy this — they prove the assistant explored the input space.
-- **After PRUNE (retention):** mutation parity on changed files (K₁ ⊇ K₀). Branch coverage MAY drop below 90% after pruning scaffolds — that is expected and correct. An 80% floor is a smoke alarm, not a gate; a `--cov-fail-under=90` setting is never the post-prune gate.
+- **After PRUNE (retention):** mutation parity on changed files (K₁ ⊇ K₀) when tooling is available; optional. Branch coverage MAY drop below 90% after pruning scaffolds — that is expected and correct. An 80% floor is a smoke alarm, not a gate; a `--cov-fail-under=90` setting is never the post-prune gate.
 
 Use `mutmut` scoped to the diff for the post-prune pass:
 ```bash

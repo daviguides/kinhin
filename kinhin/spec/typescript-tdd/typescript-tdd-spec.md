@@ -256,7 +256,7 @@ npx stryker run --mutate "src/changed-file.ts"
 ```
 
 Never run full-repo mutation in the inner loop. Scope to changed files.
-Run once in the Prune phase to verify mutation parity.
+Run once in the Prune phase to verify mutation parity (optional).
 
 ## Coverage
 
@@ -267,7 +267,7 @@ Same construction-time vs retention distinction as the universal spec:
 - **Branch coverage**: ≥ 90% on changed code
 
 ### Required Retention (after PRUNE)
-- **Mutation parity**: K₁ ⊇ K₀
+- **Mutation parity** (optional, when tooling is available): K₁ ⊇ K₀
 - **Tag completeness**: 0 untagged tests
 - **Branch coverage**: reported, 80% floor as smoke alarm (not a gate)
 
