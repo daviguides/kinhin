@@ -613,13 +613,13 @@ def test_discount_cap():
 ## Runner Anti-Patterns
 
 ### Anti-Pattern 20: Bail on First Failure
-`-x` / `--bail` / `--maxfail=1` in the fix loop: one visible failure hides the rest, the fix→run cycle goes serial, cause clustering is impossible. Rule: tdd-runner-spec → Runner Contract #1 (No Bail).
+`-x` / `--bail` / `--maxfail=1` in the fix loop: one visible failure hides the rest, the fix→run cycle goes serial, cause clustering is impossible. Rule: never bail; run the whole affected set and batch-fix.
 
 ### Anti-Pattern 21: Order-Dependent Tests
-A test passes only after another ran (shared global, DB row, file): it verifies order, not behavior. Rule: tdd-spec → Test Independence and tdd-runner-spec → Runner Contract #2–#3 (an order-only failure is `isolation-dependent`, a bug to fix).
+A test passes only after another ran (shared global, DB row, file): it verifies order, not behavior. Rule: tdd-spec → Test Independence; run in parallel and in random order, and treat an order-only failure as `isolation-dependent`, a bug to fix.
 
 ### Anti-Pattern 22: Retry Until Green
-Auto-retry (`reruns`, `--retryTimes`) as a gate reports isolation bugs and flakes as "passed". Rule: tdd-runner-spec → Runner Contract #4 (three-run protocol, three verdicts; retry only inside diagnostic mode).
+Auto-retry (`reruns`, `--retryTimes`) as a gate reports isolation bugs and flakes as "passed". Rule: rerun a failure isolated 3 times and classify it (`deterministic-fail`, `isolation-dependent`, `flaky`); retry only inside diagnostic mode, never as a gate.
 
 ### Anti-Pattern 23: Diff-String Debugging
-Reading pretty-printed ANSI diffs instead of structured operands wastes tokens and hides the delta. Rule: tdd-runner-spec → Runner Contract #6 (machine-readable output, cause clustering).
+Reading pretty-printed ANSI diffs instead of structured operands wastes tokens and hides the delta. Rule: read failures as structured data (test id, operand values, project frames, exception type) and cluster them by cause.

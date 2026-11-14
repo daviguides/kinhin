@@ -61,9 +61,8 @@ Code and test are a closed system: neither validates the other without a referen
 
 **Implementation:**
 - Tag every test at birth (untagged = scaffold)
-- Prune scaffolds in a separate pass (`tdd-prune-spec.md`); the implementing author tags, never prunes
 - Promote tests only with a stated authority
-- Collapse redundant scaffolds into table-driven decision tests
+- Scaffolds are pruned and collapsed later, in a separate pass (the milestone's `test-prune` task, or `/kinhin:prune`). The implementing author tags tests and never deletes, collapses or re-tags them to prune
 
 ## Test Organization Requirements
 
@@ -394,7 +393,6 @@ The default dependency order (types → utils → logic → integration → erro
 4. Business logic functions
 5. Replace stubs with real modules (skeleton tests keep passing)
 6. Error handling
-7. **Prune** (a separate pass, `tdd-prune-spec.md`): tag census, collapse scaffolds
 
 **Benefit**: The integration seam is exercised first while context is fresh. Pure modules fill in later and the skeleton catches regressions.
 
@@ -426,7 +424,7 @@ Line and branch coverage are informational, never a target: they measure executi
 
 ## Running Tests
 
-Run the whole affected set and read every failure: never stop at the first one (`-x`, `--exitfirst`, `--maxfail=1`, `--bail`), and never rerun a failing test until it passes. A failure that comes and goes is classified (`tdd-runner-spec.md`, Three Verdicts), not retried. Use the run commands of the language spec or the project's `make test`.
+Run the whole affected set and read every failure: never stop at the first one (`-x`, `--exitfirst`, `--maxfail=1`, `--bail`), and never rerun a failing test until it passes. A failure that comes and goes is classified, not retried: rerun it isolated 3 times; still failing is `deterministic-fail` (fix code or test); passing isolated but failing in the suite or under another seed is `isolation-dependent` (shared-state bug, fix the test); mixed results are `flaky` (quarantine with a ticket). Use the run commands of the language spec or the project's `make test`.
 
 ## Workflows
 
@@ -439,7 +437,6 @@ Run the whole affected set and read every failure: never stop at the first one (
 2. Tag each test at birth (scaffold by default, promote with reason)
 3. Generate all test files in batches
 4. Implement in dependency order
-5. **Prune** (separate pass, `tdd-prune-spec.md`): collapse scaffolds, write census line
 
 ### Workflow 2: Scenario Matrix Approach
 
@@ -449,7 +446,6 @@ Run the whole affected set and read every failure: never stop at the first one (
 1. Generate scenario matrix — **the matrix is the permanent artifact, not the tests**
 2. Generate tests from matrix cells, tagging each
 3. Implement to satisfy the matrix
-4. **Prune** (separate pass, `tdd-prune-spec.md`): collapse matrix rows into table-driven decision tests
 
 ### Workflow 3: Feature-Complete TDD
 
@@ -459,7 +455,6 @@ Run the whole affected set and read every failure: never stop at the first one (
 1. Define complete feature specification
 2. Generate comprehensive test suite across all categories
 3. Implement in dependency-ordered batches
-4. **Prune** (separate pass, `tdd-prune-spec.md`): census, collapse, census line for PR
 
 ## Success Criteria
 

@@ -98,10 +98,7 @@ fn python_invocation(root: &Path, mode: RunMode) -> Invocation {
         missing.push("pytest-testmon (changed-set selection)");
     }
     if !missing.is_empty() && mode != RunMode::Diagnostic {
-        display::print_warning(&format!(
-            "running without {}. Run: kinhin setup --install",
-            missing.join(", ")
-        ));
+        eprintln!("  {} running without optional {}", "·".dimmed(), missing.join(", "));
     }
 
     let seed = std::time::SystemTime::now()

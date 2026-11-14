@@ -15,13 +15,16 @@ struct PyDep {
     package: &'static str,
     module: &'static str,
     purpose: &'static str,
+    /// Optional plugins are reported, never required: `kinhin run` drops
+    /// the flags of a plugin the project does not install.
+    optional: bool,
 }
 
 const PYTHON_DEPS: [PyDep; 4] = [
-    PyDep { package: "pytest", module: "pytest", purpose: "test runner" },
-    PyDep { package: "pytest-xdist", module: "xdist", purpose: "parallel runs" },
-    PyDep { package: "pytest-randomly", module: "pytest_randomly", purpose: "randomized order" },
-    PyDep { package: "pytest-testmon", module: "testmon", purpose: "changed-set selection (run --mode loop)" },
+    PyDep { package: "pytest", module: "pytest", purpose: "test runner", optional: false },
+    PyDep { package: "pytest-xdist", module: "xdist", purpose: "parallel runs", optional: true },
+    PyDep { package: "pytest-randomly", module: "pytest_randomly", purpose: "randomized order", optional: true },
+    PyDep { package: "pytest-testmon", module: "testmon", purpose: "changed-set selection (run --mode loop)", optional: true },
 ];
 
 struct PythonStatus {
@@ -43,6 +46,10 @@ fn missing(label: &str, detail: &str) {
     println!("    {} {label} {}", "✗".red(), detail.dimmed());
 }
 
+fn absent_optional(label: &str, detail: &str) {
+    println!("    {} {label} {}", "·".dimmed(), format!("optional, not installed: {detail}").dimmed());
+}
+
 fn python_status(py: &PyEnv, print: bool) -> PythonStatus {
     let modules: Vec<&str> = PYTHON_DEPS.iter().map(|d| d.module).collect();
     let available = py.modules_available(&modules);
@@ -52,6 +59,10 @@ fn python_status(py: &PyEnv, print: bool) -> PythonStatus {
         if available[dep.module] {
             if print {
                 ok(dep.package, dep.purpose);
+            }
+        } else if dep.optional {
+            if print {
+                absent_optional(dep.package, dep.purpose);
             }
         } else {
             missing_packages.push(dep.package);

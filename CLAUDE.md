@@ -123,6 +123,9 @@ Classification notes:
   the first failure, never rerun until green.
 - `tdd-anti-patterns` is language-generic (it lived under Python only by
   placement), so it moves to implementing and validating.
+- Text a runner entry compiles never points at a file that entry does
+  not load (it states the rule instead); cross-file references live only
+  in files the interactive `load` reads.
 - `tdd-runner-guide` is in validating (flake protocol, full runs) and
   the interactive `load`; `tdd-lifecycle-tags` (collapse example) rides
   with `load-pruning` and `load`.
@@ -160,12 +163,12 @@ after install, or compile a copy of the source under a scratch HOME.
 
 | Entry | Chars | ~Tokens |
 |---|---|---|
-| `load` (union, all languages) | 185,335 | 51.5k |
-| `load-planning` | 37,453 | 10.4k |
-| `load-implementing` | 38,268 | 10.6k |
-| `load-validating` | 26,859 | 7.5k |
-| `load-pruning` | 57,630 | 16.0k |
-| `load-python` | 14,469 | 4.0k |
+| `load` (union, all languages) | 185,750 | 51.6k |
+| `load-planning` | 37,378 | 10.4k |
+| `load-implementing` | 38,297 | 10.6k |
+| `load-validating` | 27,222 | 7.6k |
+| `load-pruning` | 57,680 | 16.0k |
+| `load-python` | 14,552 | 4.0k |
 | `load-rust` | 18,419 | 5.1k |
 | `load-java` | 20,733 | 5.8k |
 | `load-typescript` | 19,026 | 5.3k |

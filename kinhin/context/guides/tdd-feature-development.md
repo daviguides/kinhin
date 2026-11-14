@@ -63,7 +63,7 @@ Scenarios at GREEN: `tdd-spec.md` → Scenario Requirements.
 
 ### Phase 6: Prune
 
-`tdd-prune-spec.md` (prune criteria, collapse pattern, retention requirements). In the runner, the agent never commits: the runner commits after the mode.
+A separate pass after the feature merges (the milestone's `test-prune` task, or `/kinhin:prune`), not a block of the plan: the implementing author tags tests and never prunes them.
 
 ---
 

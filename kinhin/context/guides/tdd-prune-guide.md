@@ -232,4 +232,4 @@ Deleting tests on judgment alone ("this one is obviously redundant") skips the o
 
 - Test Lifecycle: `@~/.claude/kinhin/spec/tdd/tdd-spec.md`
 - Lifecycle Tags: `@~/.claude/kinhin/context/examples/tdd-lifecycle-tags.md`
-- TDD Checklist: `@~/.claude/kinhin/context/checklists/tdd-checklist.md`
+- Prune Spec (criteria, retention, checklist): `@~/.claude/kinhin/spec/tdd/tdd-prune-spec.md`

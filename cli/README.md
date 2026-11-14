@@ -46,11 +46,11 @@ kinhin prune --apply           # delete scaffolds; then run the suite
 
 ### `kinhin setup [PATH] [--install]`
 
-Checks, per detected language, what the other commands need. For Python: `pytest`, `pytest-xdist`, `pytest-randomly`, `pytest-testmon` and the five lifecycle markers registered under `[tool.pytest.ini_options] markers`. Also checks that `claude` is on `PATH`.
+Checks, per detected language, what the other commands need. For Python: `pytest` and the five lifecycle markers registered under `[tool.pytest.ini_options] markers` are required; `pytest-xdist`, `pytest-randomly` and `pytest-testmon` are optional and only reported (`run` drops the flags of a plugin the project does not install). Also checks that `claude` is on `PATH`.
 
 `--install` (uv-managed Python projects):
 
-- runs `uv add --dev` for the missing packages;
+- runs `uv add --dev` for missing required packages (pytest); optional plugins are never installed;
 - registers the missing lifecycle markers in `pyproject.toml`, keeping any marker you already have;
 The marker edit is idempotent and never replace an existing key. If the project has a `pytest.ini`, markers are not written (pytest would ignore them there); setup says so.
 
@@ -83,7 +83,7 @@ Runs the test runner with Runner Contract flags and exits with the runner's exit
 | `full` | `-ra -q --maxfail=0 -n auto --randomly-seed=N -m 'not scaffold'` |
 | `diagnostic` | `-ra -q -x -p no:randomly -p no:xdist` |
 
-The seed is generated per run and printed in the command line, so a failing order can be replayed with `-- --randomly-seed=N`. Everything after `--` goes to the runner. `loop` relies on pytest-testmon, which writes `.testmondata` in the project root.
+The seed is generated per run and printed in the command line, so a failing order can be replayed with `-- --randomly-seed=N`. Everything after `--` goes to the runner. `loop` uses pytest-testmon when the project installs it (it writes `.testmondata` in the project root); without it, `loop` runs the whole suite.
 
 Commands built for the other languages (unverified): `cargo nextest run --no-fail-fast`, `mvn test` / `gradle test --continue`, `npx|pnpx|bunx jest|vitest`.
 

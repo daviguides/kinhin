@@ -105,4 +105,4 @@ pytest                     # full, including scaffolds, during development
 
 ## Running Tests
 
-Run the project's suite (`make test`, or the command the plan gives) on the whole affected set. Never `-x` / `--exitfirst` / `--maxfail=1`: read every failure in one run and batch-fix. Never `pytest-rerunfailures` or any rerun-until-green. Diagnostic and flake commands: `python-tdd-runner-spec.md`.
+Run the project's suite (`make test`, or the command the plan gives) on the whole affected set. Never `-x` / `--exitfirst` / `--maxfail=1`: read every failure in one run and batch-fix. Never `pytest-rerunfailures` or any rerun-until-green. A failure that comes and goes is classified (rerun isolated ×3: `deterministic-fail`, `isolation-dependent` or `flaky`), never rerun to green.
