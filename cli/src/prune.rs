@@ -1,6 +1,6 @@
 //! `kinhin prune`: delete construction-time tests (scaffold,
-//! characterization) and, with `--verify`, prove by mutation parity that
-//! nothing load-bearing went with them.
+//! characterization). The suite must still collect afterwards; every
+//! file is restored when it does not.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
@@ -13,7 +13,6 @@ use crate::census::Census;
 use crate::detect::{self, Language};
 use crate::display;
 use crate::env::{self, PyEnv};
-use crate::gate::{self, MutationRun};
 use crate::pycheck;
 use crate::pytests;
 use crate::tags::{self, LifecycleTag, TaggedTest};
@@ -39,11 +38,8 @@ pub struct PruneEntry {
 #[derive(Debug, Default, Serialize)]
 struct PruneResult {
     applied: bool,
-    verified: bool,
     deleted_tests: usize,
     deleted_files: Vec<String>,
-    /// Scaffolds restored because mutants escaped without them.
-    load_bearing: Vec<String>,
     census_line: String,
 }
 
@@ -73,42 +69,6 @@ pub fn plan(tests: &[TaggedTest], root: &Path) -> Vec<PruneEntry> {
             },
         })
         .collect()
-}
-
-/// `tests/x.py::TestA::test_b[param]` → (`tests/x.py`, `TestA::test_b`).
-fn split_node_id(node_id: &str) -> Option<(String, String)> {
-    let (file, rest) = node_id.split_once("::")?;
-    let qualified = rest.split('[').next().unwrap_or(rest);
-    Some((file.to_string(), qualified.to_string()))
-}
-
-/// Tests (file, qualified name) that execute each mangled function,
-/// from the stats mutmut wrote during its last run.
-fn tests_by_function(root: &Path) -> BTreeMap<String, Vec<(String, String)>> {
-    let Ok(content) = std::fs::read_to_string(root.join("mutants/mutmut-stats.json")) else {
-        return BTreeMap::new();
-    };
-    let Ok(value) = serde_json::from_str::<serde_json::Value>(&content) else {
-        return BTreeMap::new();
-    };
-    value
-        .get("tests_by_mangled_function_name")
-        .and_then(|v| v.as_object())
-        .map(|map| {
-            map.iter()
-                .map(|(function, tests)| {
-                    let ids = tests
-                        .as_array()
-                        .into_iter()
-                        .flatten()
-                        .filter_map(|t| t.as_str())
-                        .filter_map(split_node_id)
-                        .collect();
-                    (function.clone(), ids)
-                })
-                .collect()
-        })
-        .unwrap_or_default()
 }
 
 type Deletions = BTreeMap<String, BTreeSet<String>>;
@@ -154,7 +114,7 @@ impl Workspace<'_> {
 }
 
 /// Exit code: 0 done, 1 refused or rolled back, 2 tool error.
-pub fn run(path: &str, apply: bool, verify: bool, format: OutputFormat) -> i32 {
+pub fn run(path: &str, apply: bool, format: OutputFormat) -> i32 {
     let root = env::canonical_root(path);
     let languages = detect::detect_languages(path);
     if languages.is_empty() {
@@ -197,7 +157,7 @@ pub fn run(path: &str, apply: bool, verify: bool, format: OutputFormat) -> i32 {
         display::print_error("deleting tests is implemented for Python-only projects. The plan above lists what to delete by hand.");
         2
     } else {
-        match apply_plan(&root, &report.plan, verify, &before) {
+        match apply_plan(&root, &report.plan, &before) {
             Ok(result) => {
                 report.result = result;
                 0
@@ -217,7 +177,7 @@ pub fn run(path: &str, apply: bool, verify: bool, format: OutputFormat) -> i32 {
     code
 }
 
-fn apply_plan(root: &Path, entries: &[PruneEntry], verify: bool, before: &Census) -> Result<PruneResult, (i32, String)> {
+fn apply_plan(root: &Path, entries: &[PruneEntry], before: &Census) -> Result<PruneResult, (i32, String)> {
     let mut deletions: Deletions = BTreeMap::new();
     for entry in entries.iter().filter(|e| e.action == PruneAction::Delete) {
         deletions.entry(entry.file.clone()).or_default().insert(entry.test.clone());
@@ -238,73 +198,14 @@ fn apply_plan(root: &Path, entries: &[PruneEntry], verify: bool, before: &Census
     }
     let workspace = Workspace { root, originals };
 
-    // K₀: what the full suite kills, and which tests execute which function.
-    let baseline: Option<MutationRun> = if verify {
-        eprintln!("{} mutation baseline (K₀) with the full suite...", "→".cyan());
-        Some(gate::run_mutmut(&py, &[]).map_err(|m| (2, format!("{m}\n  nothing was deleted.")))?)
-    } else {
-        None
-    };
-    let coverage = if verify { tests_by_function(root) } else { BTreeMap::new() };
-
     let rollback = |code: i32, message: String| {
         workspace.restore();
         (code, format!("{message}\n  every test file was restored; nothing was deleted."))
     };
 
     eprintln!("{} deleting {} scaffold test(s)...", "→".cyan(), deletions.values().map(BTreeSet::len).sum::<usize>());
-    let (mut deleted, mut removed_files) = workspace.write(&deletions).map_err(|m| rollback(2, m))?;
+    let (deleted, removed_files) = workspace.write(&deletions).map_err(|m| rollback(2, m))?;
     pycheck::collect(&py).map_err(|m| rollback(1, m))?;
-
-    let mut load_bearing: Vec<String> = Vec::new();
-    if let Some(baseline) = &baseline {
-        eprintln!("{} mutation run (K₁) without the scaffolds...", "→".cyan());
-        let current = gate::run_mutmut(&py, &[]).map_err(|m| rollback(1, m))?;
-        let lost = gate::escaped(baseline, &current);
-
-        if !lost.is_empty() {
-            // Scaffolds that execute a function whose mutants escaped are the
-            // only candidates for having killed them: put those back.
-            let at_risk: BTreeSet<&str> = lost.iter().map(|e| gate::function_of(&e.mutant)).collect();
-            for function in &at_risk {
-                for (file, qualified) in coverage.get(*function).into_iter().flatten() {
-                    if deletions.get_mut(file).is_some_and(|set| set.remove(qualified)) {
-                        load_bearing.push(format!("{file}::{qualified}"));
-                    }
-                }
-            }
-            if load_bearing.is_empty() {
-                return Err(rollback(
-                    1,
-                    format!(
-                        "{} mutant(s) escaped and no deleted test could be tied to them (first: {})",
-                        lost.len(),
-                        lost[0].mutant
-                    ),
-                ));
-            }
-            eprintln!(
-                "{} {} mutant(s) escaped: restoring {} load-bearing scaffold(s), verifying again...",
-                "→".cyan(),
-                lost.len(),
-                load_bearing.len()
-            );
-            (deleted, removed_files) = workspace.write(&deletions).map_err(|m| rollback(2, m))?;
-            pycheck::collect(&py).map_err(|m| rollback(1, m))?;
-            let again = gate::run_mutmut(&py, &[]).map_err(|m| rollback(1, m))?;
-            let still_lost = gate::escaped(baseline, &again);
-            if !still_lost.is_empty() {
-                return Err(rollback(
-                    1,
-                    format!(
-                        "mutation parity not reached: {} baseline-killed mutant(s) still escape (first: {})",
-                        still_lost.len(),
-                        still_lost[0].mutant
-                    ),
-                ));
-            }
-        }
-    }
 
     // Deleting tests can orphan imports; let the project's own ruff tidy them.
     let touched: Vec<PathBuf> = workspace
@@ -318,14 +219,11 @@ fn apply_plan(root: &Path, entries: &[PruneEntry], verify: bool, before: &Census
         pycheck::collect(&py).map_err(|m| rollback(1, m))?;
     }
 
-    load_bearing.sort();
     let after = Census::from_tests(&tags::scan_test_files(&root.display().to_string(), &[Language::Python]));
     Ok(PruneResult {
         applied: true,
-        verified: verify,
         deleted_tests: deleted,
         deleted_files: removed_files,
-        load_bearing,
         census_line: census_line(before, &after),
     })
 }
@@ -386,19 +284,8 @@ fn display_result(result: &PruneResult) {
             format!(", {} file(s) removed: {}", result.deleted_files.len(), result.deleted_files.join(", "))
         }
     ));
-    if result.verified {
-        display::print_success("mutation parity holds: K₁ ⊇ K₀");
-    } else if result.deleted_tests > 0 {
-        display::print_warning("not verified: run with --verify (or `kinhin gate`) to prove nothing load-bearing was deleted");
-    }
-    if !result.load_bearing.is_empty() {
-        display::print_warning(&format!(
-            "{} scaffold(s) kept: they execute code whose mutants escaped without them. Promote each to a decision with a reason, or collapse them:",
-            result.load_bearing.len()
-        ));
-        for test in &result.load_bearing {
-            println!("    {} {test}", "·".yellow());
-        }
+    if result.deleted_tests > 0 {
+        display::print_warning("run the suite (`make test`): a red test means a deleted one was load-bearing — restore it as a decision");
     }
     println!("\n  {}", result.census_line.bold());
 }
@@ -437,18 +324,6 @@ mod tests {
                 PruneAction::Keep,
                 PruneAction::TagFirst
             ]
-        );
-    }
-
-    #[test]
-    fn node_ids_map_back_to_file_and_qualified_name() {
-        assert_eq!(
-            split_node_id("tests/marks/test_x.py::TestA::test_b[case-1]"),
-            Some(("tests/marks/test_x.py".to_string(), "TestA::test_b".to_string()))
-        );
-        assert_eq!(
-            split_node_id("tests/test_y.py::test_z"),
-            Some(("tests/test_y.py".to_string(), "test_z".to_string()))
         );
     }
 }

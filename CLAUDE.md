@@ -41,8 +41,8 @@ detect markers (`pyproject.toml` → python, `Cargo.toml` → rust,
 `tsconfig.json` → typescript) in cwd,
 ancestors, and shallow subdirectories, loading the UNION
 (monorepos load multiple). Nothing detected → python fallback.
-Universal files (methodology, guides, checklist, prune guide,
-runner guide, lifecycle tags) load ALWAYS.
+Universal files (methodology, prune spec, runner spec, guides,
+checklist, prune guide, runner guide, lifecycle tags) load ALWAYS.
 
 **4-phase TDD cycle**: Red → Green → Refactor → **Prune**. Every
 test is born with a lifecycle tag (`@scaffold` by default). The
@@ -103,21 +103,29 @@ it, and every token in the system prompt is paid on every API call.
 | Entry | Files | Mode |
 |---|---|---|
 | `load-planning` | tdd-spec, tdd-feature-development, tdd-bugfix-guide, tdd-refactoring-guide | PLANNING, PLAN_REVIEWING |
-| `load-implementing` | tdd-spec, tdd-lifecycle-tags, tdd-runner-guide, tdd-anti-patterns | IMPLEMENTING |
+| `load-implementing` | tdd-spec, tdd-anti-patterns | IMPLEMENTING |
 | `load-validating` | tdd-checklist, tdd-runner-guide, tdd-anti-patterns | VALIDATING |
 | `load-python` | python-tdd-spec, tdd-unit/integration/property/error-handling/performance-tests | IMPLEMENTING, VALIDATING |
 | `load-rust` / `load-java` / `load-typescript` | `<lang>-tdd-spec`, `<lang>-tdd-patterns` | IMPLEMENTING, VALIDATING |
-| `load-pruning` | tdd-spec, tdd-prune-guide, tdd-lifecycle-tags, tdd-anti-patterns | `test-prune` workflow: IMPLEMENTING (pruner) and VALIDATING (reviewer of the deletions) |
+| `load-pruning` | tdd-spec, tdd-prune-spec, tdd-prune-guide, tdd-lifecycle-tags, tdd-anti-patterns | `test-prune` workflow: IMPLEMENTING (pruner) and VALIDATING (reviewer of the deletions) |
 
 Classification notes:
 - `tdd-spec` sits in planning AND implementing: planning needs authority
   per block, scenario matrix, 3-question gate and dependency order;
-  implementing needs RED evidence, naming and structure. The two never
-  share a session, so nothing is paid twice.
+  implementing needs RED evidence, naming, structure and tags at birth.
+  The two never share a session, so nothing is paid twice.
+- The implementing author tags tests and never prunes or configures the
+  test runner: prune criteria, collapse, retention and the prune CLI live
+  in `tdd-prune-spec` (load-pruning, `/kinhin:prune`, `load`); the
+  Runner Contract in `tdd-runner-spec` and pytest configuration in
+  `python-tdd-runner-spec` (interactive `load` only). The author keeps
+  two lines (tdd-spec / python-tdd-spec, Running Tests): never bail on
+  the first failure, never rerun until green.
 - `tdd-anti-patterns` is language-generic (it lived under Python only by
   placement), so it moves to implementing and validating.
-- `tdd-runner-guide` is in implementing (inner loop, changed-set runs)
-  and validating (flake protocol, full runs).
+- `tdd-runner-guide` is in validating (flake protocol, full runs) and
+  the interactive `load`; `tdd-lifecycle-tags` (collapse example) rides
+  with `load-pruning` and `load`.
 - The validator gets the checklist, not `tdd-spec`: the checklist is the
   distilled, checkable form of the spec.
 - `tdd-implementation-guide` (prompt templates for a human driving an
@@ -130,12 +138,19 @@ Classification notes:
   from disk.
 - Prune judges independently: tags are the author's claim (a hint);
   a permanent tag survives when its `ref` resolves. Tests cited as
-  completeness evidence are never deleted. Mutation parity is optional
-  (the workflow's net is deterministic plus the reviewer).
+  completeness evidence are never deleted. The net is deterministic
+  (suite green, evidence preserved) plus the reviewer; no mutation
+  testing (removed, owner decision 2026-11-14).
+- Coverage is informational, never a target (owner decision
+  2026-11-13): no line/branch threshold anywhere in the plugin. An
+  owner coverage policy (`owners.yaml coverage`) is enforced by the
+  runner, not by the skill (one line in tdd-spec).
 - Per-language content (tag syntax, run commands, flake commands, CI
   profiles, structured output) lives ONLY in `<lang>-tdd-spec`, which
   always rides with implementing/validating. Universal files stay
-  language-neutral. Exception: Java/TypeScript diagnostic commands and
+  language-neutral. Python's run modes, flake commands and structured
+  output moved to `python-tdd-runner-spec` (interactive only); the
+  runner's author uses `make test`. Exception: Java/TypeScript diagnostic commands and
   the TypeScript seed rerun sit in tdd-runner-guide until their specs
   carry them.
 
@@ -145,14 +160,15 @@ after install, or compile a copy of the source under a scratch HOME.
 
 | Entry | Chars | ~Tokens |
 |---|---|---|
-| `load` (union, all languages) | 183,395 | 50.9k |
-| `load-planning` | 42,890 | 11.9k |
-| `load-implementing` | 50,889 | 14.1k |
-| `load-validating` | 27,918 | 7.8k |
-| `load-python` | 17,099 | 4.7k |
-| `load-rust` | 18,797 | 5.2k |
-| `load-java` | 21,174 | 5.9k |
-| `load-typescript` | 19,371 | 5.4k |
+| `load` (union, all languages) | 185,335 | 51.5k |
+| `load-planning` | 37,453 | 10.4k |
+| `load-implementing` | 38,268 | 10.6k |
+| `load-validating` | 26,859 | 7.5k |
+| `load-pruning` | 57,630 | 16.0k |
+| `load-python` | 14,469 | 4.0k |
+| `load-rust` | 18,419 | 5.1k |
+| `load-java` | 20,733 | 5.8k |
+| `load-typescript` | 19,026 | 5.3k |
 
 When adding a spec file: put its `Read:` line in `load.md` (interactive
 union) AND in every runner entry whose mode uses it.

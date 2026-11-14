@@ -59,11 +59,11 @@ See `tdd-spec.md` → *Dependency Implementation Order* → *Wiring First*.
 
 ### Phase 5: Validation
 
-Coverage at GREEN: `tdd-spec.md` → Coverage Requirements.
+Scenarios at GREEN: `tdd-spec.md` → Scenario Requirements.
 
 ### Phase 6: Prune
 
-`tdd-spec.md` → Test Lifecycle (prune criteria, collapse pattern, mutation parity) and Retention Requirements. In the runner, the agent never commits: the runner commits after the mode.
+`tdd-prune-spec.md` (prune criteria, collapse pattern, retention requirements). In the runner, the agent never commits: the runner commits after the mode.
 
 ---
 

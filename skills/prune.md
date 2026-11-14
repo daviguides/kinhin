@@ -7,7 +7,7 @@ user-invocable: true
 
 ## Instructions
 
-1. **Load context**: Read `~/.claude/kinhin/context/guides/tdd-prune-guide.md` and `~/.claude/kinhin/context/checklists/tdd-checklist.md`.
+1. **Load context**: Read `~/.claude/kinhin/context/guides/tdd-prune-guide.md` and `~/.claude/kinhin/spec/tdd/tdd-prune-spec.md`.
 
 2. **Tag census**: Find all test files changed on the current branch (`git diff --name-only main -- '*.test.*' '*.spec.*' '*test_*' '*_test.*'`). For each, classify tests by tag: @scaffold, @decision, @contract, @incident, untagged.
 
@@ -19,7 +19,7 @@ user-invocable: true
 
 5. **Propose deletions**: List remaining @scaffold tests that should be deleted. Show the delete set.
 
-6. **Verify**: run the suite (`make test` / `make check`). Mutation parity (`kinhin prune --apply --verify`) is optional, when tooling is available.
+6. **Verify**: run the suite (`make test` / `make check`): green after the deletions.
 
 7. **Report**: Output the census line: `written N / pruned M / survivors: X decision, Y contract, Z incident`.
 

@@ -17,7 +17,7 @@ cp target/release/kinhin ~/.cargo/bin/   # install without touching crates.io
 "It compiles" is not evidence. A command is done when it has been run against a real project and its full output read.
 
 - Keep a private copy of a real Python project as fixture; never test in a worktree someone is using.
-- After a change to `tag`, `prune` or `gate`: run the command, then `pytest --collect-only`, `kinhin census`, and the project's linter.
+- After a change to `tag` or `prune`: run the command, then `pytest --collect-only`, `kinhin census`, and the project's linter.
 - Parsers of tool output are written from captured output, saved under `tests/fixtures/`, never from memory.
 - A tool that fails must make the command fail. No result may be reported from an empty or errored run.
 - A flag changed here is changed in `README.md` in the same commit.
@@ -31,25 +31,21 @@ src/
 ├── detect.rs     language detection by project markers
 ├── tags.rs       scan test files, read lifecycle tags (Python via pytests.rs; Rust, Java, TS)
 ├── pytests.rs    Python test-file surgery: locate tests, read/insert markers, delete tests
-├── pyproject.rs  additive pyproject.toml edits (pytest markers, [tool.mutmut]) via toml_edit
+├── pyproject.rs  additive pyproject.toml edits (pytest markers) via toml_edit
 ├── pycheck.rs    pytest --collect-only gate, best-effort ruff fix
 ├── census.rs     counts by tag
 ├── audit.rs      per-test report, ref classification
 ├── run.rs        Runner Contract command per language; pytest args are a pure function
 ├── setup.rs      dependency/config check, uv install
-├── gate.rs       mutmut run, result parsing, killed-set parity
 ├── agent.rs      TaggerSession over claude-agent-toolkit, NDJSON event log
 ├── tag.rs        tag flow: cache, session, apply, verify, rollback
-├── prune.rs      plan, delete, verify with gate, restore load-bearing, rollback
+├── prune.rs      plan, delete, collect check, rollback
 └── display.rs    tables; warnings/errors/progress go to stderr
 ```
 
 ## Invariants
 
-- **Fail closed.** `gate` exits 2 when mutmut fails, generates no mutants or checks none; `tag` and `prune` restore every file when the suite stops collecting or parity is lost.
-- **K is a set.** Parity compares killed mutant ids, never counts. `segfault`/`timeout`/`suspicious` are never killed.
-- **Clean mutation runs.** `gate::run_mutmut` deletes `mutants/` first: old results describe another suite.
-- **macOS:** mutmut is launched with `NO_PROXY=*`. Without it, urllib's proxy lookup segfaults mutmut's forked workers (crash dialogs, flaky statuses).
+- **Fail closed.** `tag` and `prune` restore every file when the suite stops collecting.
 - **Destructive commands default to dry run** (`prune`). `tag` applies by default and is safe to repeat.
 - **stdout carries results, stderr carries progress**, so `--output json` is always parseable.
 - **One agent session per run**, one turn per file; never one session per file. The session has no tools and loads no user or project settings.
@@ -61,7 +57,7 @@ src/
 
 ## Scope limits (say so, don't fake it)
 
-`tag` apply, `prune --apply` and `gate` are Python-only. Other languages get an explicit error, not a silent no-op. `run` for Rust/Java/TypeScript builds a command that has not been verified on a real project.
+`tag` apply and `prune --apply` are Python-only. Other languages get an explicit error, not a silent no-op. `run` for Rust/Java/TypeScript builds a command that has not been verified on a real project.
 
 ## Dependencies
 

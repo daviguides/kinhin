@@ -308,25 +308,12 @@ nextest has no import-graph selection. Use crate-level selection:
 cargo nextest run -p <crate1> -p <crate2>  # only changed crates
 ```
 
-### Mutation Testing
-
-Use `cargo-mutants` scoped to the diff for the post-prune pass:
-```bash
-cargo mutants --in-diff HEAD~1
-```
-
 ## Coverage
 
-### Construction vs Retention
-
-Same universal targets (scenario 100%, branch ≥ 90%, constraints
-100%), measured with `cargo llvm-cov nextest`. Type-eliminated
-scenarios (Principle 1) count as covered BY CONSTRUCTION — document
-the type, not a redundant test.
-
-**At GREEN (construction-time):** ≥90% branch on changed code. Scaffolds exist to satisfy this.
-
-**After PRUNE (retention):** mutation parity on changed files (K₁ ⊇ K₀) when tooling is available; optional. Branch coverage MAY drop — that is expected after removing scaffolds.
+Same universal targets (scenario 100%, constraints 100%; line and
+branch coverage informational, `cargo llvm-cov nextest` when wanted).
+Type-eliminated scenarios (Principle 1) count as covered BY
+CONSTRUCTION — document the type, not a redundant test.
 
 ## Anti-Hallucination (Rust Form)
 

@@ -61,7 +61,7 @@ Code and test are a closed system: neither validates the other without a referen
 
 **Implementation:**
 - Tag every test at birth (untagged = scaffold)
-- Prune scaffolds before merge
+- Prune scaffolds in a separate pass (`tdd-prune-spec.md`); the implementing author tags, never prunes
 - Promote tests only with a stated authority
 - Collapse redundant scaffolds into table-driven decision tests
 
@@ -259,15 +259,6 @@ A test earns a permanent tag if **any one** holds:
 3. It pins a **boundary** another party depends on — wire format, public API, serialized payload order.
 4. The scenario was **expensive to discover** — a production incident, hours of debugging, a measured false positive.
 
-### Prune Criteria
-
-A test is pruned if **all** hold:
-
-1. It asserts **implementation shape** — mock call counts, argument matching, internal call order, private state.
-2. It is a **subset** of a surviving test's killed-mutant set.
-3. A wrong implementation would **fail loudly** elsewhere — type error, crash, obvious failing test.
-4. Nobody can name the **production failure** it prevents in one sentence.
-
 ### Explicit Rulings
 
 | Test kind | Default tag | Rationale |
@@ -277,39 +268,6 @@ A test is pruned if **all** hold:
 | Bugfix reproduction test | `@incident` | The incident is the authority |
 | Characterization test for refactoring | `@scaffold` | Golden-master dies when the refactor completes |
 | Scenario matrix exploration rows | `@scaffold` | Construction verification, not regression |
-
-### Independent Prune
-
-A tag is the author's claim, written under construction pressure. When the pruner is not the author (the runner's `test-prune` workflow, one prune per milestone), the tag is a hint, not a verdict:
-
-1. A permanent tag (`decision`, `contract`, `incident`) whose `ref` resolves to a live authority (an ADR or doc section that exists, a schema or consumer that exists, an incident ticket) keeps the test.
-2. A permanent tag with no `ref`, or a `ref` that does not resolve, is re-judged against the Graduation Criteria. Meeting none of them, it is scaffold.
-3. An untagged test is judged the same way.
-4. A test cited as evidence in a delivered task's `completeness.md` is never deleted or renamed: the delivery's proof points at it.
-5. What survives is what is pinned to something stable: a boundary contract (schema, external tool format, CLI), a regression of a real bug, an invariant of a pure function, a decision with a live ref.
-
-Never re-tag a test to make its deletion pass: record the reclassification and its reason in the prune report instead.
-
-### Collapse Pattern
-
-N scaffold rows over one function collapse into **one table-driven test** tagged `@decision`:
-
-1. Keep one representative input per equivalence class.
-2. Keep each boundary value.
-3. Keep each error class.
-4. The collapsed test inherits the strongest tag among its sources.
-5. Row identifiers appear in assertion messages (ties to Anti-Pattern #8).
-
-### Mutation Parity Protocol (optional)
-
-Verification that pruning removed nothing load-bearing, when mutation tooling is available. It is not required: the runner's `test-prune` workflow does not run it. Its safety net is deterministic (the suite stays green, evidence-cited tests survive, the owner's coverage policy when one is set) plus a reviewer in a separate session who judges every deletion.
-
-1. Run mutation testing on changed files with the **full pre-prune suite**. Record the killed-mutant set K₀.
-2. Execute the prune.
-3. Rerun mutation testing with the **post-prune suite**. Record K₁.
-4. **Require K₁ ⊇ K₀.** Any mutant killed only by a pruned test means that test was load-bearing — restore it as a promoted `@decision` or a collapsed row.
-
-Scope mutation testing to changed files only. Never run full-repo mutation in the loop.
 
 ### Drift Resistance Ladder
 
@@ -436,7 +394,7 @@ The default dependency order (types → utils → logic → integration → erro
 4. Business logic functions
 5. Replace stubs with real modules (skeleton tests keep passing)
 6. Error handling
-7. **Prune**: Tag census, collapse scaffolds, verify (mutation parity when tooling is available)
+7. **Prune** (a separate pass, `tdd-prune-spec.md`): tag census, collapse scaffolds
 
 **Benefit**: The integration seam is exercised first while context is fresh. Pure modules fill in later and the skeleton catches regressions.
 
@@ -451,15 +409,12 @@ The default dependency order (types → utils → logic → integration → erro
 5. Fix if fails (≤2 rounds, per arché anti-babysitting)
 6. Commit (in the runner, the runner commits after the mode; the agent never runs git)
 
-**Benefit**: Clear roadmap and comprehensive coverage.
+**Benefit**: Clear roadmap; every scenario has a test before its code.
 
-## Coverage Requirements (Construction-Time, Measured at GREEN)
+## Scenario Requirements (Construction-Time, at GREEN)
 
 ### Scenario Coverage
 **Requirement**: 100% of defined scenarios must have tests.
-
-### Branch Coverage
-**Requirement**: ≥ 90% branch coverage for business logic.
 
 ### Property Coverage
 **Requirement**: 100% of business constraints must have property tests.
@@ -467,58 +422,11 @@ The default dependency order (types → utils → logic → integration → erro
 ### Integration Coverage
 **Requirement**: 100% of component interactions must be tested.
 
-## Retention Requirements (Measured After PRUNE)
+Line and branch coverage are informational, never a target: they measure execution, not behavior. When an owner requires a coverage number (`~/work/projects/data/owners.yaml`, `coverage: {gate, min, scope}`), the runner enforces it from the coverage report; this skill does not.
 
-### Permanent Test Survival
-**Requirement**: 100% of `@decision`, `@contract`, and `@incident` tests whose `ref` resolves survive the prune, and 100% of tests cited as completeness evidence (see Independent Prune).
+## Running Tests
 
-### Tag Completeness
-**Requirement**: 0 untagged tests at merge. Every test is explicitly `@scaffold` (and removed) or carries a permanent tag with a `ref`.
-
-### Mutation Parity (optional)
-**Guidance**: When mutation tooling runs, mutation score on changed files after prune ≥ mutation score before prune (K₁ ⊇ K₀). Not a gate.
-
-### Branch Coverage (Smoke Alarm)
-**Guidance**: Branch coverage on changed code is reported after prune, with 80% as a smoke alarm. A drop below 80% means collapse was too aggressive — restore rows. This is a signal, not a gate.
-
-### Line Coverage
-Dropped. Table-driven collapse keeps it trivially high; it carries no signal.
-
-## Runner Contract
-
-**Requirement**: The test runner must satisfy six language-neutral requirements. These are not recommendations — they are the conditions under which TDD feedback loops function for LLM-driven development.
-
-### 1. No Bail
-Never stop at first failure. The assistant batch-fixes. This is the corollary of Batch Processing Over Sequential: generating tests in batches is pointless if the runner reports failures one at a time.
-
-### 2. Parallel by Default
-Run tests in parallel with per-test isolation. Tests that fail under parallelism but pass serially have a shared-state bug — that bug is the finding, not the parallelism.
-
-### 3. Randomized Order
-Randomize test execution order every run. Print and persist the seed. A test that passes only in a fixed order is an **isolation-dependent failure** — a bug to fix, not a flake to retry.
-
-### 4. Three Verdicts
-Classify every failure into one of three categories, never two:
-
-| Verdict | Meaning | Action |
-|---------|---------|--------|
-| `deterministic-fail` | Fails every run, in isolation and in the suite | Fix the code or the test |
-| `isolation-dependent` | Passes in isolation, fails in the suite or under a different seed | Shared state bug — fix the test |
-| `flaky` | Mixed results across isolated reruns | Quarantine with a ticket — never retry-until-green |
-
-**Three-run protocol**: On a failure, rerun isolated ×3. Still fails = `deterministic-fail`. Passes isolated → rerun in original order with original seed: fails = `isolation-dependent`, passes = `flaky`.
-
-**Retry-until-green is forbidden** outside diagnostic mode. It hides exactly the information the assistant needs.
-
-### 5. Changed-Set Selection
-In the inner loop (fix → run → fix), run only tests whose transitive import graph touches the changed files. At the gate (before PR), run the full suite. Never ship on selection alone.
-
-### 6. Machine-Readable Output
-Emit failures as structured data: test ID, assertion operands as values (not pre-rendered diffs), project-owned stack frames, exception type.
-
-**Cause clustering**: Group failures by `(innermost project-owned frame, exception type)`. If 40 tests fail because one fixture broke, the assistant sees "1 root cause, 40 dependents" — not 40 tracebacks. Fix one cluster at a time, largest first, then rerun the affected set.
-
-Output token budget: cap per cluster, strip passing tests. The assistant's context is the scarce resource; the runner should treat it like one.
+Run the whole affected set and read every failure: never stop at the first one (`-x`, `--exitfirst`, `--maxfail=1`, `--bail`), and never rerun a failing test until it passes. A failure that comes and goes is classified (`tdd-runner-spec.md`, Three Verdicts), not retried. Use the run commands of the language spec or the project's `make test`.
 
 ## Workflows
 
@@ -531,7 +439,7 @@ Output token budget: cap per cluster, strip passing tests. The assistant's conte
 2. Tag each test at birth (scaffold by default, promote with reason)
 3. Generate all test files in batches
 4. Implement in dependency order
-5. **Prune**: Collapse scaffolds, verify mutation parity, write census line
+5. **Prune** (separate pass, `tdd-prune-spec.md`): collapse scaffolds, write census line
 
 ### Workflow 2: Scenario Matrix Approach
 
@@ -541,7 +449,7 @@ Output token budget: cap per cluster, strip passing tests. The assistant's conte
 1. Generate scenario matrix — **the matrix is the permanent artifact, not the tests**
 2. Generate tests from matrix cells, tagging each
 3. Implement to satisfy the matrix
-4. **Prune**: Collapse matrix rows into table-driven decision tests, verify mutation parity
+4. **Prune** (separate pass, `tdd-prune-spec.md`): collapse matrix rows into table-driven decision tests
 
 ### Workflow 3: Feature-Complete TDD
 
@@ -551,7 +459,7 @@ Output token budget: cap per cluster, strip passing tests. The assistant's conte
 1. Define complete feature specification
 2. Generate comprehensive test suite across all categories
 3. Implement in dependency-ordered batches
-4. **Prune**: Census, collapse, mutation parity, census line for PR
+4. **Prune** (separate pass, `tdd-prune-spec.md`): census, collapse, census line for PR
 
 ## Success Criteria
 
@@ -567,30 +475,8 @@ Output token budget: cap per cluster, strip passing tests. The assistant's conte
 - All integrations tested?
 - All constraints validated?
 
-### Retention Quality (after PRUNE)
-- Every surviving test has a permanent tag with ref?
-- Mutation parity verified?
-- Census line in PR?
-- No mirror tests?
-
 ### Maintainability
 - Easy to add new tests?
 - Clear where new tests go?
 - Consistent patterns used?
 - Tests serve as documentation?
-
-## CLI Tools
-
-The Kinhin CLI automates the methodology defined in this spec. All commands are optional — every operation can be performed manually. When the CLI is installed, prefer it for consistency.
-
-| Concept | CLI Command | Manual Equivalent |
-|---|---|---|
-| Tag census and ref validation | `kinhin audit` | Grep for markers, check ref paths |
-| Tag count by lifecycle | `kinhin census` | Count markers manually |
-| Runner Contract execution | `kinhin run --mode loop\|full\|diagnostic` | Configure runner flags per language |
-| Install runner dependencies | `kinhin setup --install` | Install plugins per language manually |
-| Mutation parity gate | `kinhin gate --save-baseline\|--baseline` | Run mutation tool, compare results |
-| Auto-tag untagged tests | `kinhin tag` | Classify each test manually |
-| Prune pipeline | `kinhin prune` | Census → classify → collapse → delete → verify |
-
-Install: `cargo install --path cli` from the Kinhin repo. Agent commands (`tag`, `prune`) require the Claude Code CLI.

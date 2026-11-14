@@ -349,26 +349,12 @@ gradle :module-a:test :module-b:test
 mvn test -pl module-a,module-b -amd
 ```
 
-### Mutation Testing
-
-Use PIT scoped to the diff for the post-prune pass:
-```bash
-mvn org.pitest:pitest-maven:mutationCoverage \
-    -DtargetClasses="com.example.changed.*"
-```
-
 ## Coverage
 
-### Construction vs Retention
-
-Same universal targets (scenario 100%, branch ≥ 90%, constraints
-100%), measured with JaCoCo (shodo java-testing-tools-spec).
+Same universal targets (scenario 100%, constraints 100%; line and
+branch coverage informational, JaCoCo when wanted).
 Type-eliminated scenarios (Principle 1) count as covered BY
 CONSTRUCTION — document the type in the matrix, not a redundant test.
-
-**At GREEN (construction-time):** ≥90% branch on changed code. Scaffolds satisfy this.
-
-**After PRUNE (retention):** mutation parity on changed files (K₁ ⊇ K₀) when tooling is available; optional. Branch coverage MAY drop — expected after removing scaffolds.
 
 ## Anti-Hallucination (Java Form)
 

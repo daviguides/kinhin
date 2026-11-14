@@ -2,7 +2,7 @@
 
 ## Overview
 
-How to use test runners for code-assistant batch workflows. The universal spec defines a 6-point runner contract (`tdd-spec.md` → Runner Contract); per-language configuration is in each `<lang>-tdd-spec`. This guide covers the run modes and cause clustering. CLI: `tdd-spec.md` → CLI Tools.
+How to use test runners for code-assistant batch workflows. The universal spec defines a 6-point runner contract (`tdd-runner-spec.md` → Runner Contract); per-language configuration is in each `<lang>-tdd-spec`. This guide covers the run modes and cause clustering. CLI: `tdd-prune-spec.md` → CLI Tools.
 
 
 ## Three Run Modes
@@ -55,7 +55,7 @@ jest --testNamePattern "suspect test" --runInBand
 jest --no-bail --randomize --seed=<SEED>
 ```
 
-Flake classification (three-run protocol, three verdicts, no retry-until-green): `tdd-spec.md` → Runner Contract #4.
+Flake classification (three-run protocol, three verdicts, no retry-until-green): `tdd-runner-spec.md` → Runner Contract #4.
 
 
 ## Cause Clustering

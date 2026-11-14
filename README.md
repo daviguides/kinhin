@@ -153,11 +153,10 @@ cargo install --path cli
 | `kinhin audit` | Deterministic | List every test with its tag; check that permanent tags name an authority |
 | `kinhin census` | Deterministic | Count tests by lifecycle tag |
 | `kinhin run` | Deterministic | Run the suite under the Runner Contract (no bail, parallel, random) |
-| `kinhin gate` | Deterministic | Mutation parity on mutmut: every baseline-killed mutant must still be killed (Python) |
 | `kinhin tag` | Agent session | Classify untagged tests in one Claude session and write the markers (Python) |
-| `kinhin prune` | Deterministic | Delete scaffolds; `--verify` keeps the ones mutation parity proves load-bearing (Python) |
+| `kinhin prune` | Deterministic | Delete scaffolds; every file restored if the suite stops collecting (Python) |
 
-Census, audit and the prune plan read Python, Rust, Java and TypeScript; writing tags, deleting tests and the mutation gate are Python-only.
+Census, audit and the prune plan read Python, Rust, Java and TypeScript; writing tags and deleting tests are Python-only.
 
 See [cli/README.md](cli/README.md) for details.
 

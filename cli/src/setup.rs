@@ -17,23 +17,21 @@ struct PyDep {
     purpose: &'static str,
 }
 
-const PYTHON_DEPS: [PyDep; 5] = [
+const PYTHON_DEPS: [PyDep; 4] = [
     PyDep { package: "pytest", module: "pytest", purpose: "test runner" },
     PyDep { package: "pytest-xdist", module: "xdist", purpose: "parallel runs" },
     PyDep { package: "pytest-randomly", module: "pytest_randomly", purpose: "randomized order" },
     PyDep { package: "pytest-testmon", module: "testmon", purpose: "changed-set selection (run --mode loop)" },
-    PyDep { package: "mutmut", module: "mutmut", purpose: "mutation parity (gate, prune --verify)" },
 ];
 
 struct PythonStatus {
     missing_packages: Vec<&'static str>,
     markers: Result<Vec<&'static str>, String>,
-    mutmut_configured: bool,
 }
 
 impl PythonStatus {
     fn ready(&self) -> bool {
-        self.missing_packages.is_empty() && self.markers.as_ref().is_ok_and(Vec::is_empty) && self.mutmut_configured
+        self.missing_packages.is_empty() && self.markers.as_ref().is_ok_and(Vec::is_empty)
     }
 }
 
@@ -64,24 +62,17 @@ fn python_status(py: &PyEnv, print: bool) -> PythonStatus {
     }
 
     let markers = pyproject::markers_missing_in(&py.root);
-    let mutmut_configured = pyproject::mutmut_configured(&py.root) || py.root.join("src").is_dir();
     if print {
         match &markers {
             Ok(list) if list.is_empty() => ok("pytest markers", "lifecycle markers registered"),
             Ok(list) => missing("pytest markers", &format!("not registered: {}", list.join(", "))),
             Err(reason) => missing("pytest markers", reason),
         }
-        if mutmut_configured {
-            ok("mutmut config", "source paths known");
-        } else {
-            missing("mutmut config", "no [tool.mutmut] source_paths");
-        }
     }
 
     PythonStatus {
         missing_packages,
         markers,
-        mutmut_configured,
     }
 }
 
@@ -161,17 +152,6 @@ fn install_python(py: &PyEnv) -> bool {
             added.join(", ")
         ),
         Err(reason) => display::print_warning(&format!("pytest markers not registered: {reason}")),
-    }
-    if !(pyproject::mutmut_configured(&py.root) || py.root.join("src").is_dir()) {
-        match pyproject::ensure_mutmut(&py.root) {
-            Ok(Some(paths)) => println!(
-                "    {} wrote [tool.mutmut] source_paths = {:?} to pyproject.toml",
-                "+".green(),
-                paths
-            ),
-            Ok(None) => {}
-            Err(reason) => display::print_warning(&format!("mutmut not configured: {reason}")),
-        }
     }
     true
 }

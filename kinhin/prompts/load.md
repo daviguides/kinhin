@@ -43,11 +43,13 @@ An argument may have been passed (e.g. `/kinhin:load rust`):
    multiple languages).
 4. **Nothing detected → fallback: python.**
 
-## Universal Files (9) — ALWAYS
+## Universal Files (11) — ALWAYS
 
 ### Step 1: Read TDD Methodology
 ```
 Read: ~/.claude/kinhin/spec/tdd/tdd-spec.md
+Read: ~/.claude/kinhin/spec/tdd/tdd-prune-spec.md
+Read: ~/.claude/kinhin/spec/tdd/tdd-runner-spec.md
 ```
 
 ### Step 2: Read TDD Implementation Guides
@@ -70,11 +72,12 @@ Read: ~/.claude/kinhin/context/checklists/tdd-checklist.md
 Read: ~/.claude/kinhin/context/examples/tdd-lifecycle-tags.md
 ```
 
-## Python Files (7)
+## Python Files (8)
 
 ### Step 5a: Read Python TDD Spec
 ```
 Read: ~/.claude/kinhin/spec/python-tdd/python-tdd-spec.md
+Read: ~/.claude/kinhin/spec/python-tdd/python-tdd-runner-spec.md
 ```
 
 ### Step 6a: Read Python Test Templates
@@ -127,7 +130,7 @@ Read: ~/.claude/kinhin/context/examples/typescript-tdd-patterns.md
 
 ## HALT CONDITIONS
 
-**If you responded without reading the 9 universal files plus all
+**If you responded without reading the 11 universal files plus all
 files for every resolved language: YOU VIOLATED THIS PRINCIPLE.**
 
 ---
@@ -147,8 +150,7 @@ test-driven:
 8. **CLI** (optional) - If `kinhin` is on PATH, use it to automate:
    `kinhin audit` (tag report), `kinhin census` (tag counts),
    `kinhin run` (runner contract), `kinhin setup` (install deps),
-   `kinhin tag` (auto-classify), `kinhin prune` (full pipeline),
-   `kinhin gate` (mutation parity)
+   `kinhin tag` (auto-classify), `kinhin prune` (full pipeline)
 
 **Rust sessions additionally**: RED includes compile errors;
 type-eliminated scenarios replace defensive tests; trait seams
@@ -168,8 +170,8 @@ snapshot tests default to `@scaffold`.
 
 After reading all files, respond with the card below, filling the
 Loaded box with the actual composition (e.g.
-`universal (9) + python (7) = 16 files` or
-`universal (9) + python (7) + rust (2) + java (2) + typescript (2) = 22 files`):
+`universal (11) + python (8) = 19 files` or
+`universal (11) + python (8) + rust (2) + java (2) + typescript (2) = 25 files`):
 
 ```
 ╭─────────────────────────────────────────────────────╮
@@ -189,7 +191,7 @@ Loaded box with the actual composition (e.g.
 └─────────────────────────────────────────────────────┘
 
 ┌─ Loaded ────────────────────────────────────────────┐
-│ universal (9) + {languages with counts}             │
+│ universal (11) + {languages with counts}            │
 │ = {total} files loaded                              │
 └─────────────────────────────────────────────────────┘
 ```

@@ -247,29 +247,16 @@ vitest --changed --reporter=json
 # Use startVitest() API for sub-second re-runs in the agent harness
 ```
 
-### Mutation Testing
-
-**Requirement**: Stryker, scoped to the diff:
-
-```bash
-npx stryker run --mutate "src/changed-file.ts"
-```
-
-Never run full-repo mutation in the inner loop. Scope to changed files.
-Run once in the Prune phase to verify mutation parity (optional).
-
 ## Coverage
 
 Same construction-time vs retention distinction as the universal spec:
 
 ### Required Coverage (at GREEN)
 - **Scenario coverage**: 100% of matrix cells
-- **Branch coverage**: ≥ 90% on changed code
+- Line and branch coverage are informational, not a target
 
 ### Required Retention (after PRUNE)
-- **Mutation parity** (optional, when tooling is available): K₁ ⊇ K₀
 - **Tag completeness**: 0 untagged tests
-- **Branch coverage**: reported, 80% floor as smoke alarm (not a gate)
 
 Type-eliminated scenarios (Principle 1) count as covered BY
 CONSTRUCTION — document the type, not a redundant test.

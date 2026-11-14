@@ -52,14 +52,10 @@
 - [ ] No implicit conversions in tests
 - [ ] All assumptions explicitly tested
 
-## Code Coverage Checklist (at GREEN)
+## Scenario Checklist (at GREEN)
 
-**Coverage requirements during construction:**
-
-- [ ] Overall coverage ≥ 90%
-- [ ] Branch coverage ≥ 90%
-- [ ] All business logic functions 100% covered
-- [ ] All integration points 100% covered
+- [ ] Every defined scenario has a test
+- [ ] All integration points tested
 - [ ] All error paths tested
 - [ ] No untested edge cases
 
@@ -86,19 +82,6 @@
 - [ ] Error handling implemented
 - [ ] No code smells
 
-## Prune Checklist
-
-**Before opening the PR** (`kinhin prune --apply --verify` automates all of these):
-
-- [ ] Tag census taken (all tests enumerated by tag)
-- [ ] Every untagged test classified with one-line justification
-- [ ] All `@scaffold` tests collapsed into table-driven `@decision` tests or deleted
-- [ ] All `@characterization` tests deleted or graduated with stated reason
-- [ ] Each surviving permanent test has a `ref` or documented reason
-- [ ] Mutation pass run on changed files (K₁ ⊇ K₀ verified)
-- [ ] PR census line written: `+written N / −pruned M / survivors: X decision, Y contract, Z incident`
-- [ ] Prune changes are separate from implementation (in the runner, the runner commits; the agent never runs git)
-
 ## Post-Implementation Checklist
 
 **After implementation:**
@@ -108,12 +91,6 @@
 - [ ] No skipped tests
 - [ ] No warnings in test output
 - [ ] Tests run in reasonable time
-
-### Coverage Validation
-- [ ] Coverage report generated
-- [ ] Coverage meets construction requirements (≥90% at GREEN)
-- [ ] No untested code paths
-- [ ] Coverage gaps explained/justified
 
 ### Quality Validation
 - [ ] Static analysis passing
@@ -178,7 +155,6 @@
 ### Red Flags (Stop if Found)
 - ❌ Tests written after implementation
 - ❌ Scenario matrix incomplete
-- ❌ Coverage < 90% at GREEN
 - ❌ No property tests for constraints
 - ❌ Magic numbers without explanation
 - ❌ Weak assertions (just `assert result`)

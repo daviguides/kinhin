@@ -90,8 +90,6 @@ Ensure all tests pass before moving to next category.
 
 **Collapse**: Where multiple scaffold tests cover the same function, merge into one table-driven `@decision` test with representative inputs per equivalence class + boundaries.
 
-**Mutation parity**: Run mutation testing on changed files. K₁ ⊇ K₀. Any escaping mutant → restore or write the decision test it implies.
-
 **PR census line**: `written N / pruned M / survivors: X decision, Y contract, Z incident`.
 
 ---
@@ -193,7 +191,7 @@ Generate complete implementation satisfying all matrix cells.
 
 **Collapse**: N matrix rows over one function → one parametrized `@decision` test with one row per equivalence class + boundaries.
 
-**Mutation parity**: K₁ ⊇ K₀. PR census line.
+**PR census line**, with the suite green after the deletions.
 
 ---
 
@@ -306,7 +304,7 @@ Ensure all tests pass before completion.
 
 **Collapse and graduate**: Scaffold tests that encode a real decision → `@decision(ref=)`. Tests covering system boundaries → `@contract(ref=)`. The rest → delete or collapse into table-driven survivors.
 
-**Mutation parity**: K₁ ⊇ K₀. PR census line.
+**PR census line**, with the suite green after the deletions.
 
 ---
 
@@ -644,7 +642,7 @@ Generate complete implementation using hybrid approach.
 ### Always Avoid
 - Sequential test generation (use batch instead)
 - Implicit assumptions in tests
-- `-x` / `--bail` during batch fix loops (see Runner Contract)
+- `-x` / `--bail` during batch fix loops (see `tdd-runner-spec.md` → Runner Contract)
 - Retry-until-green to hide flakiness
 - Magic values without explanation
 - Incomplete scenario coverage

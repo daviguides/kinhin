@@ -14,11 +14,11 @@ Workflows: `tdd-spec.md` → Workflows (Test Suite First: ensure coverage, then 
 
 ### Phase 1: Pre-Refactoring Assessment
 
-**Objective**: Ensure adequate test coverage before any refactoring.
+**Objective**: Ensure the behavior being refactored is pinned by tests before any change.
 
 **Assessment Steps:**
-1. Check current test coverage (must be ≥ 90%)
-2. Identify gaps in test coverage
+1. List the behaviors the refactor touches and the tests that pin each one
+2. Write characterization tests for behaviors no test pins
 3. Run full test suite (all must pass)
 4. Identify refactoring targets and goals
 5. Document current behavior
@@ -29,9 +29,8 @@ Workflows: `tdd-spec.md` → Workflows (Test Suite First: ensure coverage, then 
 
 **Lifecycle Tag**: Tests born in this phase are `@scaffold` by default. They exist to establish a safety net for the refactoring, not as permanent regression tests. Tag at birth.
 
-**Coverage Requirements:**
-- 100% of code being refactored must be tested
-- All branches covered
+**Behavior Requirements:**
+- Every behavior of the code being refactored is pinned by a test
 - All edge cases tested
 - All error paths tested
 - All integrations tested
@@ -60,10 +59,9 @@ Workflows: `tdd-spec.md` → Workflows (Test Suite First: ensure coverage, then 
 
 **Validation Steps:**
 1. Run full test suite (all must pass)
-2. Check code coverage (must be ≥ 90%)
-3. Verify performance not degraded
-4. Run static analysis (linting, type checking)
-5. Review code quality improvements
+2. Verify performance not degraded
+3. Run static analysis (linting, type checking)
+4. Review code quality improvements
 
 ### Phase 6: Prune
 
@@ -76,7 +74,7 @@ Workflows: `tdd-spec.md` → Workflows (Test Suite First: ensure coverage, then 
    - Is it a golden-master that duplicates what surviving tests already cover? → Delete.
    - Does it pin a boundary another system depends on? → Graduate to `@contract(ref=)`.
 3. **Collapse**: Where multiple scaffold tests cover the same function, collapse into one table-driven `@decision` test with representative inputs per equivalence class.
-4. **Mutation pass**: Run mutation testing on changed files. Compare killed mutants before prune (K₀) vs after (K₁). Require K₁ ⊇ K₀. Any mutant that escapes means something load-bearing was pruned — restore or write the decision test it implies.
+4. **Run the suite**: all green after the deletions.
 5. **PR census line**: Report `written N / pruned M / survivors: X decision, Y contract, Z incident`.
 
 **Prune is a separate change** from the refactoring itself (in the runner, the agent never commits: the runner commits after the mode). The reviewer sees what was deleted and why.

@@ -6,7 +6,6 @@ mod census;
 mod detect;
 mod display;
 mod env;
-mod gate;
 mod prune;
 mod pycheck;
 mod pyproject;
@@ -28,7 +27,7 @@ pub enum OutputFormat {
     about = "TDD lifecycle manager for code-assistant workflows",
     long_about = "Red → Green → Refactor → Prune.\n\n\
         Kinhin manages the lifecycle of tests in code-assistant workflows:\n\
-        tag at birth, prune before merge, verify with mutation parity.",
+        tag at birth, prune scaffolds in a separate pass.",
     version
 )]
 struct Cli {
@@ -64,7 +63,7 @@ enum Commands {
         #[arg(default_value = ".")]
         path: String,
 
-        /// Add missing dev dependencies with `uv add --dev` and write the pytest/mutmut config
+        /// Add missing dev dependencies with `uv add --dev` and write the pytest marker config
         #[arg(long)]
         install: bool,
     },
@@ -92,28 +91,6 @@ enum Commands {
         extra: Vec<String>,
     },
 
-    /// Mutation parity gate (K₁ ⊇ K₀) on mutmut: Python projects
-    Gate {
-        /// Compare this run against a saved baseline; exit 1 if a baseline-killed mutant is no longer killed
-        #[arg(long)]
-        baseline: Option<String>,
-
-        /// Save this run as the baseline (K₀)
-        #[arg(long)]
-        save_baseline: Option<String>,
-
-        /// Restrict the run to mutant-name globs, e.g. 'pkg.services.billing*' (repeatable)
-        #[arg(long)]
-        scope: Vec<String>,
-
-        /// Project directory
-        #[arg(long, default_value = ".")]
-        path: String,
-
-        #[arg(long, value_enum, default_value_t = OutputFormat::Rich)]
-        output: OutputFormat,
-    },
-
     /// Classify untagged tests in one agent session and write the lifecycle markers
     Tag {
         /// Run the session and save the suggestions without touching any file
@@ -136,15 +113,11 @@ enum Commands {
         output: OutputFormat,
     },
 
-    /// Delete scaffold tests; with --verify, keep the ones mutation parity proves load-bearing
+    /// Delete scaffold tests (the suite must still collect; files restored otherwise)
     Prune {
         /// Delete the tests (default: show the plan only)
         #[arg(long)]
         apply: bool,
-
-        /// Prove K₁ ⊇ K₀ with mutmut; scaffolds whose removal lets mutants escape are kept
-        #[arg(long, requires = "apply")]
-        verify: bool,
 
         /// Project directory
         #[arg(long, default_value = ".")]
@@ -178,16 +151,6 @@ fn main() {
             run::run(mode, lang, ts_runner, &path, &extra);
             0
         }
-        Commands::Gate {
-            baseline,
-            save_baseline,
-            scope,
-            path,
-            output,
-        } => {
-            gate::run(&path, baseline.as_deref(), save_baseline.as_deref(), &scope, output);
-            0
-        }
         Commands::Tag {
             dry_run,
             force,
@@ -200,10 +163,9 @@ fn main() {
         }
         Commands::Prune {
             apply,
-            verify,
             path,
             output,
-        } => prune::run(&path, apply, verify, output),
+        } => prune::run(&path, apply, output),
     };
     std::process::exit(code);
 }

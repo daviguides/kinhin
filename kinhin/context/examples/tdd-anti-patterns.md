@@ -565,9 +565,9 @@ def test_process_order_confirms_and_notifies():
 **Good Example**:
 ```
 # Post-prune review
-"Mutation parity: K₁ ⊇ K₀ — all mutants killed pre-prune are still killed.
- Branch coverage dropped from 94% to 87% (expected, scaffold removal).
- No load-bearing verification lost."
+"Suite green; every @decision/@contract/@incident with a live ref survived;
+ no test cited as completeness evidence removed.
+ Branch coverage dropped from 94% to 87% (expected, scaffold removal)."
 ```
 
 ### Anti-Pattern 19: Mirror Test
@@ -613,13 +613,13 @@ def test_discount_cap():
 ## Runner Anti-Patterns
 
 ### Anti-Pattern 20: Bail on First Failure
-`-x` / `--bail` / `--maxfail=1` in the fix loop: one visible failure hides the rest, the fix→run cycle goes serial, cause clustering is impossible. Rule: tdd-spec → Runner Contract #1 (No Bail).
+`-x` / `--bail` / `--maxfail=1` in the fix loop: one visible failure hides the rest, the fix→run cycle goes serial, cause clustering is impossible. Rule: tdd-runner-spec → Runner Contract #1 (No Bail).
 
 ### Anti-Pattern 21: Order-Dependent Tests
-A test passes only after another ran (shared global, DB row, file): it verifies order, not behavior. Rule: tdd-spec → Test Independence and Runner Contract #2–#3 (an order-only failure is `isolation-dependent`, a bug to fix).
+A test passes only after another ran (shared global, DB row, file): it verifies order, not behavior. Rule: tdd-spec → Test Independence and tdd-runner-spec → Runner Contract #2–#3 (an order-only failure is `isolation-dependent`, a bug to fix).
 
 ### Anti-Pattern 22: Retry Until Green
-Auto-retry (`reruns`, `--retryTimes`) as a gate reports isolation bugs and flakes as "passed". Rule: tdd-spec → Runner Contract #4 (three-run protocol, three verdicts; retry only inside diagnostic mode).
+Auto-retry (`reruns`, `--retryTimes`) as a gate reports isolation bugs and flakes as "passed". Rule: tdd-runner-spec → Runner Contract #4 (three-run protocol, three verdicts; retry only inside diagnostic mode).
 
 ### Anti-Pattern 23: Diff-String Debugging
-Reading pretty-printed ANSI diffs instead of structured operands wastes tokens and hides the delta. Rule: tdd-spec → Runner Contract #6 (machine-readable output, cause clustering).
+Reading pretty-printed ANSI diffs instead of structured operands wastes tokens and hides the delta. Rule: tdd-runner-spec → Runner Contract #6 (machine-readable output, cause clustering).

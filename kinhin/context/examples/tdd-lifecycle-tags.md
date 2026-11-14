@@ -94,5 +94,5 @@ def test_discount_rejects_invalid(tier: str, amount: Decimal) -> None:
 - 1 type check (`isinstance`) — redundant under type hints + mypy
 - 1 large-amount test — same class as `premium_100`, no boundary
 
-**12 → 2 tests. Mutation parity: K₁ ⊇ K₀ confirmed.**
+**12 → 2 tests. Suite green after the collapse.**
 

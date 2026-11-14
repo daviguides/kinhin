@@ -80,8 +80,6 @@ def test_discount_calculation_handles_zero_amount() -> None:
 - Does it cover the same equivalence class as the reproduction test? → Collapse into the reproduction test as an additional parametrized row, or delete.
 - Is it a different bug entirely? → Separate it into its own `@incident(ref=)` with its own ticket.
 
-**Mutation parity**: Run mutation testing on changed files. The surviving suite must kill every mutant the full suite killed. If a mutant escapes, restore or write the decision test it implies.
-
 **PR census line**: `written N / pruned M / survivors: X decision, Y contract, Z incident`.
 
 ## Bug Complexity Handling
@@ -215,6 +213,6 @@ PHASE 5: Graduate and Prune
 - test_discount_with_zero_amount → @incident(ref="Bug #123"), kept
 - negative / very-small amount → collapsed as rows of the incident test
   (same root cause: missing amount <= 0 guard)
-- bulk discount with zero amount → kept only if it kills a mutant the
-  incident test does not (mutation parity), else deleted
+- bulk discount with zero amount → kept only if it pins a behavior the
+  incident test does not, else deleted
 ```

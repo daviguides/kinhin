@@ -6,9 +6,9 @@ Prune is the fourth phase of the TDD cycle: Red → Green → Refactor → **Pru
 
 Prune answers: "which tests were construction scaffolding and which earned permanent status?"
 
-Reference: `@~/.claude/kinhin/spec/tdd/tdd-spec.md` → Test Lifecycle.
+Reference: `@~/.claude/kinhin/spec/tdd/tdd-prune-spec.md` (criteria, collapse, retention) and `tdd-spec.md` → Test Lifecycle (tags, graduation).
 
-**CLI**: `kinhin prune` automates this entire procedure. Use `kinhin prune` for a dry run (shows the plan), `kinhin prune --apply` to execute, `kinhin prune --apply --verify` to execute and run mutation parity (optional). Without the CLI, follow the manual steps below.
+**CLI**: `kinhin prune` automates this entire procedure. Use `kinhin prune` for a dry run (shows the plan), `kinhin prune --apply` to execute. Without the CLI, follow the manual steps below.
 
 
 ## Procedure
@@ -72,37 +72,10 @@ After collapse, delete tests that:
 - Are still tagged `@scaffold`
 - Were not collapsed into a surviving test
 - Are not cited as evidence in a delivered task's `completeness.md`
-- Have no unique mutation-killing power (when Step 5 runs)
 
-### Step 5: Mutation Parity (optional)
+### Step 5: Run the Suite
 
-When mutation tooling is available, run mutation testing on changed files to verify nothing load-bearing was pruned. It is not required: the runner's `test-prune` workflow does not run it (see Independent Prune for its safety net).
-
-**With the CLI:** `kinhin gate --save-baseline pre.json` (before prune), then `kinhin gate --baseline pre.json` (after).
-
-**Manual protocol:**
-1. Record the mutation score BEFORE prune: `K₀ = set of killed mutants`
-2. Apply the prune (delete + collapse)
-3. Re-run mutation: `K₁ = set of killed mutants`
-4. Verify: `K₁ ⊇ K₀`
-
-If a mutant was killed only by a pruned test:
-- That test was load-bearing
-- Either restore it (promoted to `@decision`) or write a new decision test that kills the mutant
-
-```bash
-# Python
-mutmut run --paths-to-mutate=src/changed_module.py
-
-# Rust
-cargo mutants --in-diff HEAD~1
-
-# Java
-mvn org.pitest:pitest-maven:mutationCoverage -DtargetClasses="com.example.changed.*"
-
-# TypeScript
-npx stryker run --mutate "src/changed/**/*.ts"
-```
+Run the suite (`make test` / `make check`): green after the deletions. A red test after the prune means a deleted test was load-bearing — restore it as a promoted `@decision` or a collapsed row.
 
 ### Step 6: PR Census Line
 
@@ -110,7 +83,6 @@ End the PR description with:
 
 ```
 Tests: written 38 / pruned 29 / survivors: 5 decision, 2 contract, 1 incident, 1 table-driven (9 rows)
-Mutation parity: K₁ ⊇ K₀ ✓   (only when Step 5 ran)
 ```
 
 
@@ -132,7 +104,7 @@ The instrument appends one prune task to each new milestone, depending on every 
 
 Tags are hints. The author tagged under construction pressure (one suite counted 1356 `decision` against 33 `scaffold`): a permanent tag without a resolving `ref` gets judged like an untagged test.
 
-**Safety net, without mutation testing:**
+**Safety net:**
 1. The suite stays green: `make test` and `make check` for every component.
 2. Evidence preservation: every test a delivered task cited as evidence still exists, same file, same name. The runner checks it before the reviewer.
 3. The owner's coverage policy, when the owner has one (`owners.yaml coverage`): a gate on constrains how much can go.
@@ -178,17 +150,11 @@ A `parseConfig` function with 38 tests generated during construction:
 
 **Step 4 — Delete:** 28 tests removed.
 
-**Step 5 — Mutation parity:**
-```
-Before prune: 47 mutants killed, 3 survived
-After prune:  47 mutants killed, 3 survived
-K₁ ⊇ K₀ ✓
-```
+**Step 5 — Run the suite:** green.
 
 **Step 6 — Census line:**
 ```
 Tests: written 38 / pruned 28 / survivors: 6 decision, 2 contract, 1 incident, 1 table-driven (5 rows)
-Mutation parity: K₁ ⊇ K₀ ✓
 ```
 
 ### After Prune
@@ -259,7 +225,7 @@ An assistant under "execute to completion" pressure may re-tag a `@decision` tes
 
 ### Mistake 4: Pruning Without a Safety Net
 
-Deleting tests on judgment alone ("this one is obviously redundant") skips the objective check. The net is deterministic: the suite stays green, evidence-cited tests survive, the owner's coverage policy holds, and a second reader (the reviewer) judges each deletion. Mutation parity adds to it when tooling is available; it is not required.
+Deleting tests on judgment alone ("this one is obviously redundant") skips the objective check. The net is deterministic: the suite stays green, evidence-cited tests survive, the owner's coverage policy holds, and a second reader (the reviewer) judges each deletion.
 
 
 ## References
