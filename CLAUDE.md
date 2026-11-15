@@ -174,15 +174,15 @@ after install, or compile a copy of the source under a scratch HOME.
 
 | Entry | Chars | ~Tokens |
 |---|---|---|
-| `load` (union, all languages) | 185,473 | 51.5k |
+| `load` (union, all languages) | 185,642 | 51.6k |
 | `load-planning` | 34,632 | 9.6k |
-| `load-implementing` | 36,772 | 10.2k |
-| `load-validating` | 27,370 | 7.6k |
-| `load-pruning` | 64,313 | 17.9k |
-| `load-python` | 12,824 | 3.6k |
+| `load-implementing` | 35,894 | 10.0k |
+| `load-validating` | 26,492 | 7.4k |
+| `load-pruning` | 64,378 | 17.9k |
+| `load-python` | 12,877 | 3.6k |
 | `load-rust` | 16,944 | 4.7k |
 | `load-java` | 19,183 | 5.3k |
-| `load-typescript` | 18,000 | 5.0k |
+| `load-typescript` | 18,051 | 5.0k |
 
 When adding a spec file: put its `Read:` line in `load.md` (interactive
 union) AND in every runner entry whose mode uses it.

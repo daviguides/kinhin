@@ -545,32 +545,7 @@ def test_process_order_confirms_and_notifies():
     assert any(n.type == "order_confirmed" for n in notifications)
 ```
 
-### Anti-Pattern 18: Coverage as Retention Metric
-
-**Problem**: Using branch or line coverage to decide which tests to keep after pruning.
-
-**Why It's Bad**:
-- Coverage rewards keeping shape-tests that touch trivial branches
-- A test asserting `mock.call_count == 1` covers the call site — 100% branch, 0% verification
-- Coverage measures what was EXECUTED, not what was VERIFIED
-- Actively opposes pruning: removing scaffold drops coverage, triggering "add tests back"
-
-**Bad Example**:
-```
-# Post-prune review
-"Coverage dropped from 94% to 87% after pruning scaffolds.
- Restoring 12 mock-assertion tests to meet the 90% gate."
-```
-
-**Good Example**:
-```
-# Post-prune review
-"Suite green; every @decision/@contract/@incident with a live ref survived;
- no test cited as completeness evidence removed.
- Branch coverage dropped from 94% to 87% (expected, scaffold removal)."
-```
-
-### Anti-Pattern 19: Mirror Test
+### Anti-Pattern 18: Mirror Test
 
 **Problem**: Editing a permanent test's assertion to match changed code instead of fixing the code.
 
@@ -612,14 +587,14 @@ def test_discount_cap():
 
 ## Runner Anti-Patterns
 
-### Anti-Pattern 20: Bail on First Failure
+### Anti-Pattern 19: Bail on First Failure
 `-x` / `--bail` / `--maxfail=1` in the fix loop: one visible failure hides the rest, the fix→run cycle goes serial, cause clustering is impossible. Rule: never bail; run the whole affected set and batch-fix.
 
-### Anti-Pattern 21: Order-Dependent Tests
+### Anti-Pattern 20: Order-Dependent Tests
 A test passes only after another ran (shared global, DB row, file): it verifies order, not behavior. Rule: tdd-spec → Test Independence; run in parallel and in random order, and treat an order-only failure as `isolation-dependent`, a bug to fix.
 
-### Anti-Pattern 22: Retry Until Green
+### Anti-Pattern 21: Retry Until Green
 Auto-retry (`reruns`, `--retryTimes`) as a gate reports isolation bugs and flakes as "passed". Rule: rerun a failure isolated 3 times and classify it (`deterministic-fail`, `isolation-dependent`, `flaky`); retry only inside diagnostic mode, never as a gate.
 
-### Anti-Pattern 23: Diff-String Debugging
+### Anti-Pattern 22: Diff-String Debugging
 Reading pretty-printed ANSI diffs instead of structured operands wastes tokens and hides the delta. Rule: read failures as structured data (test id, operand values, project frames, exception type) and cluster them by cause.

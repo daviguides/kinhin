@@ -49,11 +49,12 @@ These still demand TDD:
 ### Boundary Validation Schemas
 
 **Requirement**: Zod, Valibot, or ArkType schemas that validate runtime
-input are `@contract` tests — they pin the shape another party depends
-on (an API consumer, a client, a database migration).
+input deserve boundary tests — they pin the shape another party depends
+on (an API consumer, a client, a database migration). Cite that party in
+a comment; do not tag the test.
 
 ```typescript
-// @contract(ref="POST /api/orders request body")
+// Pins the POST /api/orders request body (API consumers)
 describe('OrderInput schema', () => {
   it.each([
     [{ amount: -1 }, 'negative amount'],
@@ -106,7 +107,7 @@ as a separate step — never rely on the runner for type checking.
 testing to verify the type contracts themselves:
 
 ```typescript
-// @contract(ref="public API — UserService return type")
+// Pins the public API: UserService return type
 import { expectTypeOf } from 'vitest';
 import type { UserService } from './user.service';
 

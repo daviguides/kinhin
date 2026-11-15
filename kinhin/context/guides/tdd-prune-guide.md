@@ -2,7 +2,7 @@
 
 ## Overview
 
-Prune is the fourth phase of the TDD cycle: Red → Green → Refactor → **Prune**. Interactively it runs once per deliverable, before merge, as its own commit. In the runner it runs once per milestone, as its own task (`workflow: test-prune`), after every other task of the milestone merged: see Independent Prune below.
+Prune is a separate pass after the TDD cycle (Red → Green → Refactor), never by the author: `kinhin tag` + `/kinhin:prune` interactively, once per deliverable before merge, as its own commit; the milestone's `test-prune` task in the runner. In the runner it runs once per milestone, as its own task (`workflow: test-prune`), after every other task of the milestone merged: see Independent Prune below.
 
 Prune answers: "which tests were construction scaffolding and which earned permanent status?"
 

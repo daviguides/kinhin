@@ -90,6 +90,31 @@ N scaffold rows over one function collapse into **one table-driven test** tagged
 - Census line in the PR or prune report?
 - No mirror tests?
 
+### Anti-Pattern: Coverage as Retention Metric
+
+**Problem**: Using branch or line coverage to decide which tests to keep after pruning.
+
+**Why It's Bad**:
+- Coverage rewards keeping shape-tests that touch trivial branches
+- A test asserting `mock.call_count == 1` covers the call site — 100% branch, 0% verification
+- Coverage measures what was EXECUTED, not what was VERIFIED
+- Actively opposes pruning: removing scaffold drops coverage, triggering "add tests back"
+
+**Bad**:
+```
+# Post-prune review
+"Coverage dropped from 94% to 87% after pruning scaffolds.
+ Restoring 12 mock-assertion tests to meet the 90% gate."
+```
+
+**Good**:
+```
+# Post-prune review
+"Suite green; every @decision/@contract/@incident with a live ref survived;
+ no test cited as completeness evidence removed.
+ Branch coverage dropped from 94% to 87% (expected, scaffold removal)."
+```
+
 ## Prune Checklist
 
 **Before opening the PR** (`kinhin prune --apply` automates the census, collapse and deletion):
