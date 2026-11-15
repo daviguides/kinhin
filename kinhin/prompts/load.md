@@ -141,13 +141,14 @@ When Kinhin TDD context is loaded, ALL implementations must be
 test-driven:
 
 1. **Test First** - Write tests before implementation
-2. **Red-Green-Refactor-Prune** - Follow the 4-phase TDD cycle
+2. **Red-Green-Refactor** - The author's cycle; prune is a separate pass
 3. **Batch Processing** - Generate tests in batches
 4. **Property-Based** - Invariants via hypothesis (Python) / proptest (Rust) / fast-check (TypeScript)
 5. **Anti-Hallucination** - Tests prevent LLM hallucinations
-6. **Prune** - Tag at birth, prune scaffolds before PR
-7. **Runner contract** - No bail, parallel, randomized, structured output
-8. **CLI** (optional) - If `kinhin` is on PATH, use it to automate:
+6. **Prune separately** - The session that wrote the tests never tags, collapses or deletes them: classify and prune in a separate pass (`kinhin tag` + `/kinhin:prune`)
+7. **Suite strength** - Proven by the scenario matrix, RED per block and review (B5); no mutation testing
+8. **Runner contract** - No bail, parallel, randomized, structured output
+9. **CLI** (optional) - If `kinhin` is on PATH, use it to automate:
    `kinhin audit` (tag report), `kinhin census` (tag counts),
    `kinhin run` (runner contract), `kinhin setup` (install deps),
    `kinhin tag` (auto-classify), `kinhin prune` (full pipeline)
@@ -163,8 +164,8 @@ before mocks; ArchUnit rules as tests.
 
 **TypeScript sessions additionally**: RED includes type errors
 (`tsc --noEmit` is step 1); types are erased and unsound — do not
-test what strict TS proves; module mocks are scaffold smell;
-snapshot tests default to `@scaffold`.
+test what strict TS proves; module mocks and snapshot tests carry
+no authority.
 
 ## Confirmation
 
@@ -178,8 +179,8 @@ Loaded box with the actual composition (e.g.
 │                                                     │
 │     ●        ●                                      │
 │     ↓        ↓    │  Walking Meditation for TDD     │
-│  K  I  N  H  I  N  │  経行 - Red, Green, Refactor,  │
-│     ┴        ┴    │  Prune (v2.4.0)                 │
+│  K  I  N  H  I  N  │  経行 - Red, Green, Refactor  │
+│     ┴        ┴    │  (v3.1.0)                       │
 │                                                     │
 ╰─────────────────────────────────────────────────────╯
 
@@ -187,7 +188,10 @@ Loaded box with the actual composition (e.g.
 │ 🔴 RED      → Write failing test first              │
 │ 🟢 GREEN    → Make it pass (minimal code)           │
 │ 🔵 REFACTOR → Clean up, maintain tests              │
-│ ⚪ PRUNE    → Delete scaffold, keep decisions       │
+└─────────────────────────────────────────────────────┘
+
+┌─ Separate pass ─────────────────────────────────────┐
+│ ⚪ PRUNE    → /kinhin:prune, never by the author     │
 └─────────────────────────────────────────────────────┘
 
 ┌─ Loaded ────────────────────────────────────────────┐

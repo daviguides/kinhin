@@ -10,7 +10,7 @@
 - [ ] Has clear docstring explaining what is tested
 - [ ] Has type hints on all parameters
 - [ ] Returns None (test functions)
-- [ ] Tagged at birth (`@scaffold`, `@decision`, `@contract`, or `@incident`)
+- [ ] Cites its source (ADR, doc, ticket, consumer) in the docstring when it pins a rule from one
 
 ### Content
 - [ ] Arranges test data explicitly (no hidden setup)
@@ -162,7 +162,7 @@
 - ❌ Implicit type conversions
 - ❌ Over-mocking (mocking everything)
 - ❌ Brittle tests (break with minor changes)
-- ❌ Untagged tests at merge
+- ❌ The author tagged, collapsed or deleted tests (classification and prune are a separate pass)
 - ❌ Runner bails on first failure
 - ❌ Tests pass only in file order
 - ❌ Retry-until-green in CI

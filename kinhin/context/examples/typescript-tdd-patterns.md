@@ -15,7 +15,7 @@ to test it, and what NOT to test.
 Tests verify what the USER sees and does, not what the component renders internally.
 
 ```typescript
-// @decision(ref="user can submit order with valid amount")
+// Authority: user can submit order with valid amount
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -52,7 +52,7 @@ interactions. `userEvent` simulates the full browser event sequence
 (focus → keydown → keypress → input → keyup → change):
 
 ```typescript
-// ❌ SCAFFOLD — fires one synthetic event, skips the real sequence
+// ❌ AVOID — fires one synthetic event, skips the real sequence
 fireEvent.change(input, { target: { value: '100' } });
 
 // ✅ DECISION — simulates real user typing
@@ -91,14 +91,14 @@ These mock the MECHANISM, not the BOUNDARY.
 
 ### Banned Patterns
 
-| Pattern | Why banned | Lifecycle tag if found |
-|---------|-----------|----------------------|
-| Shallow rendering (`shallow()`) | Tests component in isolation from its children — misses integration bugs, couples to implementation | `@scaffold` — delete |
-| Asserting hook internals (`result.current.count`) | Tests implementation, not behavior | `@scaffold` — delete |
-| Permanent render-tree snapshots | Couples to markup structure; breaks on every refactor; assistant "updates" them reflexively | `@scaffold` — ALWAYS |
-| Testing CSS classes | Classes are styling implementation, not behavior | `@scaffold` — delete |
+| Pattern | Why banned | If found |
+|---------|-----------|----------|
+| Shallow rendering (`shallow()`) | Tests component in isolation from its children — misses integration bugs, couples to implementation | Don't write; the prune deletes it |
+| Asserting hook internals (`result.current.count`) | Tests implementation, not behavior | Don't write; the prune deletes it |
+| Permanent render-tree snapshots | Couples to markup structure; breaks on every refactor; assistant "updates" them reflexively | Never permanent; the prune deletes it |
+| Testing CSS classes | Classes are styling implementation, not behavior | Don't write; the prune deletes it |
 | Prop-type tests under strict TS | `tsc` already verifies prop shapes | Redundant — don't write |
-| `container.innerHTML` assertions | Tests HTML string, not user-visible behavior | `@scaffold` — delete |
+| `container.innerHTML` assertions | Tests HTML string, not user-visible behavior | Don't write; the prune deletes it |
 
 ### Component Test = Behavior Test
 
@@ -122,7 +122,7 @@ IS the system under test for data-layer code — mocking it removes the
 thing being verified.
 
 ```typescript
-// @contract(ref="order creation persists with correct fields")
+// Authority: order creation persists with correct fields
 test('creates order with all fields', async () => {
   const order = await prisma.order.create({
     data: { amount: 100, userId: testUser.id, status: 'PENDING' },
@@ -207,17 +207,17 @@ test('calculates total from items', () => {
 ### Contract Tests
 
 **Requirement**: Tests that verify database constraints, indexes,
-and migration behavior are `@contract`:
+and migration behavior pin a contract: cite the constraint they verify.
 
 ```typescript
-// @contract(ref="orders.user_id foreign key")
+// Authority: orders.user_id foreign key
 test('rejects order with non-existent user', async () => {
   await expect(
     prisma.order.create({ data: { amount: 100, userId: 'nonexistent' } }),
   ).rejects.toThrow(/Foreign key constraint/);
 });
 
-// @contract(ref="unique index on orders.external_id")
+// Authority: unique index on orders.external_id
 test('rejects duplicate external_id', async () => {
   await prisma.order.create({ data: { ...validOrder, externalId: 'dup' } });
   await expect(
@@ -233,7 +233,7 @@ against the real database — the query syntax, the parameter binding,
 and the result shape are all invisible to `tsc`:
 
 ```typescript
-// @contract(ref="analytics aggregate query")
+// Authority: analytics aggregate query
 test('aggregates orders by status', async () => {
   // Arrange: seed known data
   await seedOrders([

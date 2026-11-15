@@ -4,7 +4,7 @@
 
 **Kinhin** (経行 / 禅歩) is the practice of walking meditation in Zen Buddhism, serving as active transition between periods of zazen (seated meditation).
 
-**Philosophy**: Like walking meditation with deliberate steps, Kinhin guides developers through TDD with mindful progression - red, green, refactor, prune.
+**Philosophy**: Like walking meditation with deliberate steps, Kinhin guides developers through TDD with mindful progression - red, green, refactor; prune is a separate pass.
 
 
 ## Structure
@@ -44,11 +44,17 @@ ancestors, and shallow subdirectories, loading the UNION
 Universal files (methodology, prune spec, runner spec, guides,
 checklist, prune guide, runner guide, lifecycle tags) load ALWAYS.
 
-**4-phase TDD cycle**: Red → Green → Refactor → **Prune**. Every
-test is born with a lifecycle tag (`@scaffold` by default). The
-burden of proof is on keeping a test. Scaffolds die at prune;
-permanent tests (`@decision`, `@contract`, `@incident`) carry a
-ref pointing to their authority source.
+**Author's cycle**: Red → Green → Refactor. **Prune is a separate
+pass** (owner decision 2026-11-14, interactive included): the session
+that wrote the tests never tags, collapses or deletes them; `kinhin
+tag` + `/kinhin:prune`, or the runner's per-milestone `test-prune`
+task, classify and prune. The author cites a test's source (ADR,
+ticket, consumer) in its docstring when it has one. The burden of
+proof is on keeping a test: the classification tags each one
+(`scaffold` by default; permanent `decision`, `contract`,
+`incident` carry a ref to their authority) and scaffolds die at
+prune. Suite strength is proven by the scenario matrix, RED per
+block and the reviewer's B5; no mutation testing.
 
 **Runner contract**: no bail, parallel by default, randomized order,
 three-way flaky classification, changed-set selection in inner loop,
@@ -73,7 +79,7 @@ Mockito, Testcontainers, ArchUnit, JaCoCo) lives in shodo's
 **TypeScript TDD**: types are erased and unsound — the central
 difference from Rust and Java. RED includes type errors (`tsc
 --noEmit` is step 1). Do not test what strict TS proves. Module
-mocks are scaffold smell. Snapshot tests default to `@scaffold`.
+mocks and snapshot tests carry no authority.
 
 
 ## Related Plugins
@@ -112,11 +118,12 @@ it, and every token in the system prompt is paid on every API call.
 Classification notes:
 - `tdd-spec` sits in planning AND implementing: planning needs authority
   per block, scenario matrix, 3-question gate and dependency order;
-  implementing needs RED evidence, naming, structure and tags at birth.
+  implementing needs RED evidence, naming, structure and suite strength.
   The two never share a session, so nothing is paid twice.
-- The implementing author tags tests and never prunes or configures the
-  test runner: prune criteria, collapse, retention and the prune CLI live
-  in `tdd-prune-spec` (load-pruning, `/kinhin:prune`, `load`); the
+- The author (runner or interactive) never tags, prunes or configures the
+  test runner: lifecycle tags, graduation criteria, prune criteria,
+  collapse, retention and the prune CLI live in `tdd-prune-spec`
+  (load-pruning, `/kinhin:prune`, `load`); the
   Runner Contract in `tdd-runner-spec` and pytest configuration in
   `python-tdd-runner-spec` (interactive `load` only). The author keeps
   two lines (tdd-spec / python-tdd-spec, Running Tests): never bail on
@@ -127,8 +134,9 @@ Classification notes:
   not load (it states the rule instead); cross-file references live only
   in files the interactive `load` reads.
 - `tdd-runner-guide` is in validating (flake protocol, full runs) and
-  the interactive `load`; `tdd-lifecycle-tags` (collapse example) rides
-  with `load-pruning` and `load`.
+  the interactive `load`; `tdd-lifecycle-tags` (marker syntax per
+  language, collapse example) rides with `load-pruning`, `load` and
+  `/kinhin:prune`.
 - The validator gets the checklist, not `tdd-spec`: the checklist is the
   distilled, checkable form of the spec.
 - `tdd-implementation-guide` (prompt templates for a human driving an
@@ -148,9 +156,12 @@ Classification notes:
   2026-11-13): no line/branch threshold anywhere in the plugin. An
   owner coverage policy (`owners.yaml coverage`) is enforced by the
   runner, not by the skill (one line in tdd-spec).
-- Per-language content (tag syntax, run commands, flake commands, CI
-  profiles, structured output) lives ONLY in `<lang>-tdd-spec`, which
-  always rides with implementing/validating. Universal files stay
+- Per-language content (run commands, flake commands, CI profiles,
+  structured output) lives ONLY in `<lang>-tdd-spec`, which always
+  rides with implementing/validating. Exception: the lifecycle marker
+  syntax per language lives in `tdd-lifecycle-tags` (load-pruning,
+  `/kinhin:prune`, `load`), since only the classification writes tags;
+  `kinhin tag` carries its own tagger prompt in the CLI. Universal files stay
   language-neutral. Python's run modes, flake commands and structured
   output moved to `python-tdd-runner-spec` (interactive only); the
   runner's author uses `make test`. Exception: Java/TypeScript diagnostic commands and
@@ -163,15 +174,15 @@ after install, or compile a copy of the source under a scratch HOME.
 
 | Entry | Chars | ~Tokens |
 |---|---|---|
-| `load` (union, all languages) | 185,750 | 51.6k |
-| `load-planning` | 37,378 | 10.4k |
-| `load-implementing` | 38,297 | 10.6k |
-| `load-validating` | 27,222 | 7.6k |
-| `load-pruning` | 57,680 | 16.0k |
-| `load-python` | 14,552 | 4.0k |
-| `load-rust` | 18,419 | 5.1k |
-| `load-java` | 20,733 | 5.8k |
-| `load-typescript` | 19,026 | 5.3k |
+| `load` (union, all languages) | 185,473 | 51.5k |
+| `load-planning` | 34,632 | 9.6k |
+| `load-implementing` | 36,772 | 10.2k |
+| `load-validating` | 27,370 | 7.6k |
+| `load-pruning` | 64,313 | 17.9k |
+| `load-python` | 12,824 | 3.6k |
+| `load-rust` | 16,944 | 4.7k |
+| `load-java` | 19,183 | 5.3k |
+| `load-typescript` | 18,000 | 5.0k |
 
 When adding a spec file: put its `Read:` line in `load.md` (interactive
 union) AND in every runner entry whose mode uses it.

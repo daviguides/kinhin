@@ -1,6 +1,6 @@
 # TDD Property-Based Test Templates (Python)
 
-Hypothesis properties are anti-hallucination barriers: invariants that must always hold. Strategies and profile configuration: shodo `python-testing-tools-spec.md`.
+Hypothesis properties are anti-hallucination barriers: invariants that must always hold. Use Hypothesis strategies with the project's registered profile; the strategy catalog is in shodo's testing tools (interactive).
 
 ## Anti-Hallucination Properties
 

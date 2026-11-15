@@ -84,7 +84,6 @@ the runner. This is the single most dangerous gap in TypeScript TDD.
               tsc errors is not green — it is unverified.
 🟢 GREEN    → tsc clean AND test passes.
 🔵 REFACTOR → tsc clean AND tests pass after changes.
-⚪ PRUNE     → Scaffold tests deleted. tsc still clean.
 ```
 
 ### Runner Choice
@@ -118,9 +117,9 @@ test('getUser returns User, not User | undefined', () => {
 ```
 
 - `expectTypeOf` (Vitest built-in) or `tsd` for standalone — these
-  are `@contract` tests
+  pin the exported type as a contract
 - Internal type assertions (verifying a helper's generic resolves
-  correctly) are `@scaffold`
+  correctly) carry no authority
 
 ## Principle 4: Module Mocks Are Scaffold Smell
 
@@ -134,7 +133,7 @@ hoisting interacts poorly with top-level await and re-exports.
 ### The Rule
 
 **Requirement**: Module mocks (`vi.mock('module')`, `jest.mock('module')`)
-are `@scaffold` by default. If a test cannot run without mocking an
+carry no authority: the prune removes them. If a test cannot run without mocking an
 entire module, the production code needs a dependency injection seam:
 
 ```typescript
@@ -156,45 +155,6 @@ const service = new OrderService(fakeEmail);
 **Exception**: Mocking environment or infrastructure boundaries
 (`process.env`, `fetch` via MSW, `Date.now`) is acceptable — these are
 genuine I/O boundaries.
-
-## Lifecycle Tagging
-
-### Jest: File Suffix Convention
-
-Jest has no built-in tag filter. Use file suffixes to separate scaffold
-from permanent tests:
-
-```
-tests/
-├── order.service.test.ts              # permanent tests
-├── order.service.scaffold.test.ts     # scaffold — deleted at prune
-└── order.service.contract.test.ts     # contract tests (optional suffix)
-```
-
-**Prune = delete `*.scaffold.test.ts` files.**
-
-CI exclusion:
-```json
-// jest.config.ts
-{
-  "testPathIgnorePatterns": ["\\.scaffold\\.test\\."]
-}
-```
-
-### Vitest: Project or Name Prefix
-
-Vitest supports `--project` for workspace-based filtering or test-name
-prefix convention:
-
-```typescript
-// vitest.config.ts — workspace approach
-export default defineWorkspace([
-  { test: { include: ['**/*.test.ts'], exclude: ['**/*.scaffold.test.ts'] } },
-  { test: { name: 'scaffold', include: ['**/*.scaffold.test.ts'] } },
-]);
-```
-
-CI exclusion: `vitest --project default` (excludes scaffold workspace).
 
 ## Runner Configuration
 
@@ -255,9 +215,6 @@ Same construction-time vs retention distinction as the universal spec:
 - **Scenario coverage**: 100% of matrix cells
 - Line and branch coverage are informational, not a target
 
-### Required Retention (after PRUNE)
-- **Tag completeness**: 0 untagged tests
-
 Type-eliminated scenarios (Principle 1) count as covered BY
 CONSTRUCTION — document the type, not a redundant test.
 
@@ -281,11 +238,11 @@ static/dynamic nature:
 ### Snapshot Tests
 
 **Requirement**: Snapshot tests (`.toMatchSnapshot()`,
-`.toMatchInlineSnapshot()`) default to `@scaffold` — they verify the
+`.toMatchInlineSnapshot()`) carry no authority — they verify the
 current shape, not the intended shape.
 
 **Exception**: A snapshot of a serialized format consumed by an external
-party (API response, wire protocol, file format) is `@contract`.
+party (API response, wire protocol, file format) pins a contract.
 Render-tree snapshots are NEVER permanent — component markup is
 implementation, not specification.
 

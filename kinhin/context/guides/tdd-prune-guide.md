@@ -6,7 +6,7 @@ Prune is the fourth phase of the TDD cycle: Red → Green → Refactor → **Pru
 
 Prune answers: "which tests were construction scaffolding and which earned permanent status?"
 
-Reference: `@~/.claude/kinhin/spec/tdd/tdd-prune-spec.md` (criteria, collapse, retention) and `tdd-spec.md` → Test Lifecycle (tags, graduation).
+Reference: `@~/.claude/kinhin/spec/tdd/tdd-prune-spec.md` (lifecycle tags, graduation, criteria, collapse, retention) and `tdd-lifecycle-tags.md` (marker syntax per language).
 
 **CLI**: `kinhin prune` automates this entire procedure. Use `kinhin prune` for a dry run (shows the plan), `kinhin prune --apply` to execute. Without the CLI, follow the manual steps below.
 
@@ -42,7 +42,7 @@ Record: `total`, `scaffold`, `decision`, `contract`, `incident`, `untagged`.
 
 ### Step 2: Classify Untagged Tests
 
-Every untagged test, and every permanent-tagged test whose `ref` is missing or does not resolve, must be classified with a one-line justification (tags are the author's claim; see Independent Prune):
+Every untagged test, and every permanent-tagged test whose `ref` is missing or does not resolve, must be classified with a one-line justification (tags are hints; see Independent Prune):
 
 - If it encodes a decision → tag `@decision(reason=...)` and keep
 - If it guards a silent failure → tag `@decision` or `@incident` and keep
@@ -102,7 +102,7 @@ The instrument appends one prune task to each new milestone, depending on every 
 
 **Remove or collapse** everything else: shape assertions (mock call counts, private state), subsets of survivors, scenario-matrix rows (collapse into one table-driven test).
 
-Tags are hints. The author tagged under construction pressure (one suite counted 1356 `decision` against 33 `scaffold`): a permanent tag without a resolving `ref` gets judged like an untagged test.
+Tags are hints. Legacy suites were tagged under construction pressure (one counted 1356 `decision` against 33 `scaffold`): a permanent tag without a resolving `ref` gets judged like an untagged test. New tests arrive untagged: the author does not tag, so the classification happens here.
 
 **Safety net:**
 1. The suite stays green: `make test` and `make check` for every component.
@@ -230,6 +230,5 @@ Deleting tests on judgment alone ("this one is obviously redundant") skips the o
 
 ## References
 
-- Test Lifecycle: `@~/.claude/kinhin/spec/tdd/tdd-spec.md`
-- Lifecycle Tags: `@~/.claude/kinhin/context/examples/tdd-lifecycle-tags.md`
-- Prune Spec (criteria, retention, checklist): `@~/.claude/kinhin/spec/tdd/tdd-prune-spec.md`
+- Prune Spec (lifecycle tags, graduation, criteria, retention, checklist): `@~/.claude/kinhin/spec/tdd/tdd-prune-spec.md`
+- Marker syntax per language: `@~/.claude/kinhin/context/examples/tdd-lifecycle-tags.md`

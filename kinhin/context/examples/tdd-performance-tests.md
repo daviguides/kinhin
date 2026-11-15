@@ -3,7 +3,7 @@
 Performance tests never assert wall-clock thresholds inside the parallel, randomized suite (`-n auto -p randomly`): timing there is noise, and the result is a flake. They run as a separate, serial benchmark run, marked `performance` and excluded from the gate.
 
 ```bash
-pytest -m "not scaffold and not performance"       # gate: permanent tests, no timing tests
+pytest -m "not performance"       # gate: no timing tests
 pytest -m performance -p no:xdist -p no:randomly   # benchmark run, serial
 ```
 
@@ -35,7 +35,7 @@ def test_with_setup_benchmark(benchmark: BenchmarkFixture) -> None:
 
 ## Marker Registration
 
-Add to the lifecycle `markers` list (`--strict-markers`):
+Register the marker in `pyproject.toml` (`--strict-markers` rejects unregistered markers):
 
 ```toml
 [tool.pytest.ini_options]

@@ -208,64 +208,6 @@ fn reports_dirty_repos_only() { ... }
 fn scan_command_exits_nonzero_on_missing_root() { ... }
 ```
 
-## Lifecycle Tagging
-
-Rust has no built-in marker system. Use module naming and doc comments.
-
-### Scaffold Tests — `mod scaffold`
-
-**Requirement**: Construction-time tests live in a `mod scaffold` inside `#[cfg(test)]`.
-
-```rust
-#[cfg(test)]
-mod tests {
-    // Permanent tests live here at the top level
-
-    mod scaffold {
-        // Construction-time verification — deleted at prune
-        use super::*;
-
-        #[test]
-        fn parser_returns_expected_keys() { ... }
-
-        #[test]
-        fn validator_rejects_empty_string() { ... }
-    }
-}
-```
-
-**The delete set** — list every scaffold in the crate:
-```bash
-cargo test scaffold:: -- --list
-```
-
-### Permanent Tests — Doc Comment Tags
-
-**Requirement**: Every permanent test carries a `// kinhin:` doc comment with its tag and reference.
-
-```rust
-// kinhin: decision(ref="docs/payments/fees.md#rate-protection")
-#[test]
-fn grace_period_uses_higher_of_old_and_new_set() { ... }
-
-// kinhin: contract(ref="API v2 wire format")
-#[test]
-fn serialize_roundtrip_preserves_all_fields() { ... }
-
-// kinhin: incident(ref="ISSUE-186")
-#[test]
-fn invalidation_never_scans_keyspace() { ... }
-```
-
-Do NOT invent `cfg` features for lifecycle tags — `cfg(scaffold)` would require a feature flag and complicate the build.
-
-### CI Exclusion
-
-The CI gate runs the full suite excluding scaffolds:
-```bash
-cargo nextest run --filter-expr 'not test(scaffold::)'
-```
-
 ## Runner Configuration
 
 **Requirement**: Use cargo-nextest, not `cargo test`. The built-in runner lacks per-test process isolation and structured output.
@@ -290,8 +232,8 @@ path = "target/nextest/ci/junit.xml"
 # Inner loop (changed crate only):
 cargo nextest run -p <changed_crate> --no-fail-fast
 
-# Full gate (before PR, excluding scaffolds):
-cargo nextest run --filter-expr 'not test(scaffold::)' --profile ci
+# Full gate:
+cargo nextest run --profile ci
 
 # Diagnostic mode (isolate a flake):
 cargo nextest run --no-fail-fast -j 1 --filter-expr 'test(the_flaky_test)'

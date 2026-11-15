@@ -84,13 +84,9 @@ Generate all implementations in this category simultaneously.
 Ensure all tests pass before moving to next category.
 ```
 
-#### Step 4: Prune
+#### After Step 3
 
-**Tag census**: Review all tests by tag. Every `@scaffold` test is a candidate for deletion or collapse.
-
-**Collapse**: Where multiple scaffold tests cover the same function, merge into one table-driven `@decision` test with representative inputs per equivalence class + boundaries.
-
-**PR census line**: `written N / pruned M / survivors: X decision, Y contract, Z incident`.
+**Prune is a separate step**, not part of this session: classify and prune with `kinhin tag` + `/kinhin:prune` in a separate pass. The session that wrote the tests does not tag, collapse or delete them.
 
 ---
 
@@ -185,13 +181,11 @@ Implement with these constraints:
 Generate complete implementation satisfying all matrix cells.
 ```
 
-#### Step 4: Prune
+#### After Step 3
 
-**The matrix is the permanent artifact, not the tests.** The scenario matrix persists as a document (PR description or design doc). The tests are table-driven survivors.
+**The matrix is the permanent artifact, not the tests.** The scenario matrix persists as a document (PR description or design doc).
 
-**Collapse**: N matrix rows over one function → one parametrized `@decision` test with one row per equivalence class + boundaries.
-
-**PR census line**, with the suite green after the deletions.
+**Prune is a separate step**, not part of this session: classify and prune with `kinhin tag` + `/kinhin:prune` in a separate pass. The session that wrote the tests does not tag, collapse or delete them.
 
 ---
 
@@ -298,13 +292,9 @@ Generate all implementations simultaneously.
 Ensure all tests pass before completion.
 ```
 
-#### Step 4: Prune
+#### After Step 3
 
-**Tag census**: Review all tests. Tag at birth should have been applied during Step 2. Any untagged test is `@scaffold` by default.
-
-**Collapse and graduate**: Scaffold tests that encode a real decision → `@decision(ref=)`. Tests covering system boundaries → `@contract(ref=)`. The rest → delete or collapse into table-driven survivors.
-
-**PR census line**, with the suite green after the deletions.
+**Prune is a separate step**, not part of this session: classify and prune with `kinhin tag` + `/kinhin:prune` in a separate pass. The session that wrote the tests does not tag, collapse or delete them.
 
 ---
 
@@ -636,8 +626,7 @@ Generate complete implementation using hybrid approach.
 - AAA pattern (Arrange-Act-Assert)
 - Clear assertion messages
 - Property-based tests for constraints
-- Tags at birth on every test (`@scaffold` is the default)
-- Prune phase before PR
+- Prune as a separate step (`kinhin tag` + `/kinhin:prune`), never by the session that wrote the tests
 
 ### Always Avoid
 - Sequential test generation (use batch instead)

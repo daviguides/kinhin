@@ -2,7 +2,7 @@
 
 ## Authority
 
-Code and test are a closed system: neither validates the other without a reference point outside both. Every test either names an authority outside that system — a documented decision, an external contract, a production incident — or it does not. The tag on a test is a pointer to that authority, not a label of intent.
+Code and test are a closed system: neither validates the other without a reference point outside both. Every test either names an authority outside that system — a documented decision, an external contract, a production incident — or it does not. The author writes tests to build the code; deciding which tests have an authority and survive is a separate pass (classification and prune), never the author's job.
 
 ## Core Principles
 
@@ -50,19 +50,13 @@ Code and test are a closed system: neither validates the other without a referen
 - Validate cross-function consistency
 - Use property-based testing tools
 
-### Lifecycle Over Accumulation
-**Requirement**: Every test is born with a lifecycle tag. The default tag is `@scaffold`. The burden of proof is on **keeping** a test, not on deleting it.
-
-**Benefits:**
-- Prevents test bloat from surviving construction
-- Forces explicit reasoning about each test's purpose
-- Makes pruning mechanical rather than judgmental
-- Separates construction-time verification from long-term regression
+### Construction Over Accumulation
+**Requirement**: The author's cycle is Red → Green → Refactor. Tests written during construction are construction tests: the burden of proof is on **keeping** a test, not on deleting it, and that judgment belongs to a separate pass.
 
 **Implementation:**
-- Tag every test at birth (untagged = scaffold)
-- Promote tests only with a stated authority
-- Scaffolds are pruned and collapsed later, in a separate pass (the milestone's `test-prune` task, or `/kinhin:prune`). The implementing author tags tests and never deletes, collapses or re-tags them to prune
+- Write the tests the block needs; do not add lifecycle tags or markers
+- When a test pins a rule from a named source (ADR, doc section, ticket, API spec, consumer), cite that source in the test's docstring or comment
+- Classification and prune run later, by someone other than the author (`kinhin tag` + `/kinhin:prune`, or the milestone's `test-prune` task). The author never deletes, collapses, tags or re-tags tests to prune
 
 ## Test Organization Requirements
 
@@ -165,7 +159,7 @@ Component:
 
 ## 3-Question Gate at RED
 
-**Requirement**: Before writing any assertion, answer three questions in order. The answer determines the verification rung and the tag.
+**Requirement**: Before writing any assertion, answer three questions in order. The answer determines the verification mechanism.
 
 ### Question 1: Can the type system refuse the wrong state?
 
@@ -177,11 +171,9 @@ Discriminated unions, branded types, required parameters with no default, exhaus
 
 ### Question 3: What is the authority, and where does it live?
 
-- Named and linkable (ADR, doc section, ticket, API spec) → `@decision(ref=)` / `@contract(ref=)` / `@incident(ref=)`. **Rung 3.**
-- Named but only in your head → write it down first, or accept **Rung 4** and say so.
-- Not named → `@scaffold`. **Rung 5.** It dies at prune.
-
-The output of the gate IS the tag. No extra ceremony.
+- Named and linkable (ADR, doc section, ticket, API spec) → a test that cites the source. **Rung 3.**
+- Named but only in your head → write it down first, or accept **Rung 4** (a test with an inline reason) and say so.
+- Not named → a construction test with no authority of its own. **Rung 5.**
 
 ## Anti-Hallucination Patterns
 
@@ -226,47 +218,7 @@ The output of the gate IS the tag. No extra ceremony.
 - Clear error messages
 - Documented assumptions
 
-## Test Lifecycle
-
-### Tags at Birth
-
-Every test receives a lifecycle tag when written. Untagged tests are `@scaffold` by default.
-
-**Temporary tags** (die at prune):
-
-| Tag | Authority | Lifetime |
-|-----|-----------|----------|
-| `scaffold` | None — the author's momentary belief during construction | Deleted or collapsed at prune |
-| `characterization` | None — golden-master snapshot for a refactoring | Deleted after refactor completes |
-
-**Permanent tags** (survive prune, require a `ref`):
-
-| Tag | Authority | Ref points to |
-|-----|-----------|---------------|
-| `decision(ref=)` | A documented choice | ADR, doc section, ticket, code comment with rationale |
-| `contract(ref=)` | An external consumer | API doc, wire format, schema, iOS client contract |
-| `incident(ref=)` | Production behavior that failed | Incident ticket, postmortem, date of failure |
-
-**Corollary**: A test with no authority has no right to outlive construction.
-
-### Graduation Criteria
-
-A test earns a permanent tag if **any one** holds:
-
-1. It encodes a **decision** not visible from the mechanism — the "why", not the "how".
-2. It guards a failure that would be **silent in production** — wrong value returned, no exception raised, data quietly corrupted.
-3. It pins a **boundary** another party depends on — wire format, public API, serialized payload order.
-4. The scenario was **expensive to discover** — a production incident, hours of debugging, a measured false positive.
-
-### Explicit Rulings
-
-| Test kind | Default tag | Rationale |
-|-----------|-------------|-----------|
-| Property test (invariant) | `@decision` | Invariants are decisions — otherwise they get pruned as "re-derivable" |
-| Integration test crossing system boundary | `@contract` | The boundary is the authority |
-| Bugfix reproduction test | `@incident` | The incident is the authority |
-| Characterization test for refactoring | `@scaffold` | Golden-master dies when the refactor completes |
-| Scenario matrix exploration rows | `@scaffold` | Construction verification, not regression |
+## Verification Strength
 
 ### Drift Resistance Ladder
 
@@ -276,9 +228,9 @@ Every verification mechanism has a resistance to drift — the tendency for clai
 |------|-----------|-----------------|-----|
 | 1 | **Type constraint** (compiler, type checker) | Immune | Won't compile. No value to edit. |
 | 2 | **Structural invariant / arch test** | Almost immune | Tests shape, not value. Hard to "fix" wrong. |
-| 3 | **`@decision` with ref pointing to live source** | Drifts but screams | The test fails; the ref is checkable. |
-| 4 | **`@decision` with inline reason** | Drifts, still fails | Weaker than rung 3 but stronger than a comment — a comment never fails. |
-| 5 | **`@scaffold`** | N/A | Dies before it can drift. |
+| 3 | **Test citing a live source** (ADR, doc, ticket, schema) | Drifts but screams | The test fails; the source is checkable. |
+| 4 | **Test with an inline reason** | Drifts, still fails | Weaker than rung 3 but stronger than a comment — a comment never fails. |
+| 5 | **Construction test** (no authority) | N/A | Removed at prune before it can drift. |
 
 **Rungs 1–2 are not "better tests".** They are the authority encoded as a **constraint** instead of an **assertion**. That is why they do not drift — there is no value to edit. A type that prevents an invalid state and an arch test that greps for a forbidden pattern are both constraints; a unit test that checks `result == expected` is an assertion.
 
@@ -292,11 +244,12 @@ When a test fails, the failure is in the **code**, in the **test**, or in **both
 
 ### Attribution by Authority
 
+A test names its authority through a permanent marker (`decision`, `contract`, `incident` with a `ref`, set by the classification pass) or a source cited in its docstring.
+
 | Failing test | Authority | Default stance |
 |---|---|---|
-| `@scaffold` | None | **Investigate.** Either side may be wrong. The assistant decides. |
-| `@decision` / `@contract` / `@incident` | Named | **Test is the spec. Fix the code.** Changing the test requires confirming the authority changed. |
-| Untagged (legacy) | Unknown | **Treat as scaffold** with a warning. Tagging it is part of the fix. |
+| No marker or `scaffold`, no cited source | None | **Investigate.** Either side may be wrong. The assistant decides. |
+| Permanent marker with a `ref`, or a cited source | Named | **Test is the spec. Fix the code.** Changing the test requires confirming the authority changed. |
 
 ### Anti-Pattern: Mirror Test
 
@@ -304,20 +257,20 @@ A **mirror test** is a permanent test edited to assert whatever the code now doe
 
 ### Golden Rule
 
-Permanent tests (`@decision`, `@contract`, `@incident`) are **never corrected to match changed code** without confirming that the authority itself changed.
+Tests that name an authority are **never corrected to match changed code** without confirming that the authority itself changed.
 
 **Default path (95% of cases, no pause):** Permanent test fails → treat as spec → change the code → continue. This path never stops execution.
 
 **Blocked path (5%):** The assistant believes the test is wrong. It does **not** edit the test. It:
 1. Finishes everything else in the task that does not depend on the failing test.
 2. Leaves the test red.
-3. Ends the turn with a precise statement: "`@decision(ref=X)` asserts P; the change requires ¬P. Either the decision at X was revisited and the test + doc should change, or the change is wrong."
+3. Ends the turn with a precise statement: "The test (authority: X) asserts P; the change requires ¬P. Either the decision at X was revisited and the test + doc should change, or the change is wrong."
 
 One stop at the **end** of execution, not a pause in the middle.
 
-**Never**: Quietly re-tag a permanent test to `@scaffold` so it can be edited.
+**Never**: Quietly remove or downgrade a permanent marker so the test can be edited.
 
-**Escape hatch**: When the user's instruction **is** the authority change ("we're dropping the 30-day grace period"), the assistant may edit the test **and** must update the `ref` target in the same change. Instruction-in-hand counts as approval.
+**Escape hatch**: When the user's instruction **is** the authority change ("we're dropping the 30-day grace period"), the assistant may edit the test **and** must update the source it cites (the `ref` target) in the same change. Instruction-in-hand counts as approval.
 
 ## Authority Source per Block
 
@@ -328,7 +281,7 @@ One stop at the **end** of execution, not a pause in the middle.
 | Source | Block type | Test requirement | Example |
 |--------|-----------|-----------------|---------|
 | **Plan** | Pure logic (validation, calculation, formatting) | Unit test. Authority is the plan/spec | `validateConfirmation()`, `truncateAnswer()` |
-| **Existing codebase** | Wiring/orchestration (connects modules, calls SDKs) | `@contract` test with fixture copied from the code that already consumes this boundary. Never invent the fixture | `index.ts` calling `runAgentTurn` — copy the pattern from `ask.service.ts` |
+| **Existing codebase** | Wiring/orchestration (connects modules, calls SDKs) | Contract test with fixture copied from the code that already consumes this boundary. Never invent the fixture | `index.ts` calling `runAgentTurn` — copy the pattern from `ask.service.ts` |
 | **Brief/acceptance criteria** | Feature acceptance (the thing the user asked for) | e2e test against isolated environment (test channel, staging, recorded replay) | "Event in Slack → response out" |
 
 ### Default Classification
@@ -348,7 +301,7 @@ For every wiring boundary, the plan MUST cite the existing code that already con
 
 If no existing code consumes the boundary (new SDK, new API), the plan says so and requires reading the SDK types/docs/examples before writing the test fixture.
 
-**Hand-authored mocks of an external shape are `@scaffold` by default.** They die at prune unless promoted with evidence that the shape matches the real system.
+**Hand-authored mocks of an external shape carry no authority.** The prune removes them unless there is evidence that the shape matches the real system.
 
 ### Rung Check
 
@@ -356,13 +309,13 @@ Before writing a test for a wiring block, ask: "can a type refuse the wrong stat
 
 1. **Type constraint** (compiler refuses) → no test
 2. **Structural invariant** → arch test
-3. **`@contract` with fixture from codebase** → the standard for wiring
-4. **`@decision` with inline reason** → pure logic
-5. **`@scaffold`** → dies at prune
+3. **Contract test with fixture from codebase** → the standard for wiring
+4. **Test with an inline reason** → pure logic
+5. **Construction test** → removed at prune
 
 ## RED Evidence
 
-**Requirement**: The RED phase must produce observable evidence. A test that was never seen failing before passing is `@scaffold` by definition — it proves the code matches itself, not the spec.
+**Requirement**: The RED phase must produce observable evidence. A test that was never seen failing before passing has no authority by definition — it proves the code matches itself, not the spec.
 
 **Mechanism**: Before implementing the code for a block, run the tests. Record the failing output:
 
@@ -400,7 +353,7 @@ The default dependency order (types → utils → logic → integration → erro
 **Requirement**: Generate tests before implementation for each block.
 
 **Process per block:**
-1. Write tests (tagged at birth)
+1. Write tests
 2. Run tests → RED (record evidence)
 3. Implement → GREEN
 4. Run `bash validation.sh <worktree> <N>` for the block
@@ -420,6 +373,9 @@ The default dependency order (types → utils → logic → integration → erro
 ### Integration Coverage
 **Requirement**: 100% of component interactions must be tested.
 
+### Suite Strength
+**Requirement**: The strength of the suite is proven by three checks: the scenario matrix (100% of defined scenarios have a test), observed RED for every block before its code exists, and the reviewer's check that every brief-mandated behavior has a passing test (B5). Mutation testing is not part of the method: do not add, configure or recommend it.
+
 Line and branch coverage are informational, never a target: they measure execution, not behavior. When an owner requires a coverage number (`~/work/projects/data/owners.yaml`, `coverage: {gate, min, scope}`), the runner enforces it from the coverage report; this skill does not.
 
 ## Running Tests
@@ -434,9 +390,8 @@ Run the whole affected set and read every failure: never stop at the first one (
 
 **Process:**
 1. Design complete test suite with scenario matrix
-2. Tag each test at birth (scaffold by default, promote with reason)
-3. Generate all test files in batches
-4. Implement in dependency order
+2. Generate all test files in batches
+3. Implement in dependency order
 
 ### Workflow 2: Scenario Matrix Approach
 
@@ -444,7 +399,7 @@ Run the whole affected set and read every failure: never stop at the first one (
 
 **Process:**
 1. Generate scenario matrix — **the matrix is the permanent artifact, not the tests**
-2. Generate tests from matrix cells, tagging each
+2. Generate tests from matrix cells
 3. Implement to satisfy the matrix
 
 ### Workflow 3: Feature-Complete TDD

@@ -6,33 +6,32 @@
 
 ## What is Kinhin?
 
-**Kinhin** (経行 / 禅歩) is the practice of walking meditation in Zen Buddhism — the active transition between periods of *zazen* (seated meditation). Like walking meditation with deliberate steps, Kinhin guides developers through TDD with mindful progression: **red, green, refactor, prune**.
+**Kinhin** (経行 / 禅歩) is the practice of walking meditation in Zen Buddhism — the active transition between periods of *zazen* (seated meditation). Like walking meditation with deliberate steps, Kinhin guides developers through TDD with mindful progression: **red, green, refactor** — and, as a separate pass, **prune**.
 
 Kinhin provides **universal TDD methodology** plus **language-specific deltas** for Python, Rust, Java, and TypeScript — workflow guides, test templates, anti-patterns, lifecycle management, runner contracts, and checklists.
 
-## The 4-Phase Cycle
+## The Cycle and the Separate Prune
 
 ```
 🔴 RED      → Write failing test first
 🟢 GREEN    → Make it pass (minimal code)
 🔵 REFACTOR → Clean up, maintain tests
-⚪ PRUNE    → Delete scaffold, keep decisions
 ```
 
-Every test is born with a **lifecycle tag**. The burden of proof is on *keeping* a test, not deleting it.
+The author's cycle ends at REFACTOR. **Prune is a separate pass** (`kinhin tag` + `/kinhin:prune`, or the runner's per-milestone `test-prune` task): whoever wrote the tests does not judge what to delete. The burden of proof is on *keeping* a test, not deleting it. The classification gives every test a **lifecycle tag**:
 
 - `@scaffold` — construction verification, dies at prune (the default)
 - `@decision(ref=)` — encodes a non-obvious decision, permanent
 - `@contract(ref=)` — pins a cross-party boundary, permanent
 - `@incident(ref=)` — reproduces a production failure, permanent
 
-A Kinhin PR ends with a census line: `written 41 / pruned 33 / survivors: 5 decision, 2 contract, 1 incident`.
+A prune pass ends with a census line: `written 41 / pruned 33 / survivors: 5 decision, 2 contract, 1 incident`.
 
 ## Key Concepts
 
 ### Authority Model
 
-Code and test are a closed system — neither validates the other. Every test either names an authority outside that system or it does not. The tag is a pointer to that authority.
+Code and test are a closed system — neither validates the other. Every test either names an authority outside that system or it does not. The classification's tag is a pointer to that authority.
 
 ### Drift Resistance Ladder
 
@@ -40,9 +39,9 @@ Before writing any test, ask "can I move up a rung?":
 
 1. **Type constraint** — immune to drift (won't compile)
 2. **Structural invariant / arch test** — almost immune (no value to adjust)
-3. **`@decision` with ref to live source** — drifts but fails
-4. **`@decision` with inline reason** — drifts, still fails
-5. **`@scaffold`** — dies before it can drift
+3. **Test citing a live source** — drifts but fails
+4. **Test with an inline reason** — drifts, still fails
+5. **Construction test** — removed at prune before it can drift
 
 ### Runner Contract
 
@@ -64,7 +63,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/daviguides/kinhin/main/i
 
 TDD is not a single leap from nothing to correct — it's a walk taken in deliberate steps, each one testable before the next.
 
-> *"Red. Green. Refactor. Prune. Repeat."*
+> *"Red. Green. Refactor. Repeat. Prune apart."*
 
 ### Rust TDD is not translated Python TDD
 
@@ -76,7 +75,7 @@ NullAway/enum/record scenarios are type-eliminated, RED includes compile errors,
 
 ### TypeScript TDD: erasure-aware
 
-Types are erased and unsound — the central difference from Rust and Java. RED includes type errors (`tsc --noEmit` is step 1). Do not test what strict TS proves. Module mocks are scaffold smell. Snapshot tests default to `@scaffold`.
+Types are erased and unsound — the central difference from Rust and Java. RED includes type errors (`tsc --noEmit` is step 1). Do not test what strict TS proves. Module mocks and snapshot tests carry no authority.
 
 ## Relationship with Other Plugins
 

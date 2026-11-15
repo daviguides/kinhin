@@ -384,7 +384,7 @@ def test_format_user_includes_all_fields():
     assert result.count("test@example.com") == 1
     assert re.search(r"\b1\b", result)
     # When the exact layout IS a contract with a consumer, assert the full
-    # string and tag the test @contract instead.
+    # string and cite the consumer in the docstring instead.
 ```
 
 ### Anti-Pattern 13: Over-Mocking
@@ -487,16 +487,16 @@ def test_legacy_format_output():
 
 **Good Example**:
 ```python
-# Characterization test tagged and pruned after refactoring
-@pytest.mark.scaffold  # Dies at prune
+# Characterization test written during the refactor, left untagged:
+# the separate prune pass (not the author) removes it afterwards
 def test_legacy_format_output():
     """Characterization: captures current output during refactor."""
     result = format_report(data)
     assert result == "Header: Test\nBody: content\nFooter: v2"
 
-# After refactoring, scaffold deleted. Surviving decision test:
-@pytest.mark.decision(reason="Report must include version in footer")
+# What survives the prune pins the decision and cites its source:
 def test_report_footer_contains_version():
+    """Report must include the version in the footer (docs/report.md#footer)."""
     result = format_report(data)
     assert "v2" in result.split("\n")[-1]
 ```

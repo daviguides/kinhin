@@ -7,11 +7,11 @@ user-invocable: true
 
 ## Instructions
 
-1. **Load context**: Read `~/.claude/kinhin/context/guides/tdd-prune-guide.md` and `~/.claude/kinhin/spec/tdd/tdd-prune-spec.md`.
+1. **Load context**: Read `~/.claude/kinhin/context/guides/tdd-prune-guide.md`, `~/.claude/kinhin/spec/tdd/tdd-prune-spec.md` and `~/.claude/kinhin/context/examples/tdd-lifecycle-tags.md` (marker syntax per language). This is a separate pass: the session that wrote the tests does not run it.
 
 2. **Tag census**: Find all test files changed on the current branch (`git diff --name-only main -- '*.test.*' '*.spec.*' '*test_*' '*_test.*'`). For each, classify tests by tag: @scaffold, @decision, @contract, @incident, untagged.
 
-3. **Classify untagged and unproven**: For each untagged test, and each permanent-tagged test whose `ref` is missing or does not resolve (tags are the author's claim, a hint), read the test and determine: does it pin a contract, reproduce a real bug, hold an invariant of a pure function, encode a decision with a live ref, or is it construction scaffolding? Propose a category and tag.
+3. **Classify untagged and unproven**: For each untagged test, and each permanent-tagged test whose `ref` is missing or does not resolve (tags are hints, not verdicts), read the test and determine: does it pin a contract, reproduce a real bug, hold an invariant of a pure function, encode a decision with a live ref, or is it construction scaffolding? Propose a category and tag.
 
    **Never** delete or rename a test cited as evidence in a delivered task's `completeness.md`.
 

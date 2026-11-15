@@ -1,4 +1,4 @@
-# Kinhin: TDD for implementing (RED evidence, cycle, tags at birth)
+# Kinhin: TDD for implementing (RED evidence, cycle, suite strength)
 
 Runner entry (compiled into the system prompt by gradient-cli). Interactive use: `/kinhin:load`.
 

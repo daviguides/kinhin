@@ -27,7 +27,7 @@ Workflows: `tdd-spec.md` → Workflows (Test Suite First: ensure coverage, then 
 
 **Objective**: Fill any gaps in test coverage before refactoring.
 
-**Lifecycle Tag**: Tests born in this phase are `@scaffold` by default. They exist to establish a safety net for the refactoring, not as permanent regression tests. Tag at birth.
+These tests establish a safety net for the refactoring, not permanent regression tests. Do not tag them; the separate prune pass judges them.
 
 **Behavior Requirements:**
 - Every behavior of the code being refactored is pinned by a test
@@ -39,7 +39,7 @@ Workflows: `tdd-spec.md` → Workflows (Test Suite First: ensure coverage, then 
 
 **Objective**: Create tests that explicitly validate current behavior.
 
-**Lifecycle Tag**: Tests born in this phase are `@characterization` — golden-master snapshots of current behavior that exist solely to detect unintended changes during the refactoring. They are temporary by design and must be graduated or deleted in the Prune phase.
+These are characterization tests — golden-master snapshots of current behavior that exist solely to detect unintended changes during the refactoring. They are temporary by design; the separate prune pass graduates or deletes them.
 
 **Types of Behavior Tests:**
 - **Input/Output Tests**: Validate outputs for all input scenarios
@@ -63,21 +63,9 @@ Workflows: `tdd-spec.md` → Workflows (Test Suite First: ensure coverage, then 
 3. Run static analysis (linting, type checking)
 4. Review code quality improvements
 
-### Phase 6: Prune
+### After the Refactor: Prune Is a Separate Pass
 
-**Objective**: Remove construction-time tests that served their purpose, keep only what protects against future regression.
-
-**Steps:**
-1. **Tag census**: List all tests by tag. Every `@scaffold` and `@characterization` test is a candidate for deletion.
-2. **Graduate or delete**: For each characterization test, decide:
-   - Does it encode a non-obvious decision about behavior? → Graduate to `@decision(ref=)` with a stated reason.
-   - Is it a golden-master that duplicates what surviving tests already cover? → Delete.
-   - Does it pin a boundary another system depends on? → Graduate to `@contract(ref=)`.
-3. **Collapse**: Where multiple scaffold tests cover the same function, collapse into one table-driven `@decision` test with representative inputs per equivalence class.
-4. **Run the suite**: all green after the deletions.
-5. **PR census line**: Report `written N / pruned M / survivors: X decision, Y contract, Z incident`.
-
-**Prune is a separate change** from the refactoring itself (in the runner, the agent never commits: the runner commits after the mode). The reviewer sees what was deleted and why.
+The author stops at Phase 5. Removing the characterization and safety-net tests that served their purpose is a separate pass, by someone other than the author (`kinhin tag` + `/kinhin:prune`, or the milestone's `test-prune` task), with its own review of what was deleted and why.
 
 ---
 
@@ -141,4 +129,4 @@ Workflows: `tdd-spec.md` → Workflows (Test Suite First: ensure coverage, then 
 
 ### Keeping Every Characterization Test
 **Problem**: Characterization tests written to snapshot current behavior before a refactoring outlive the refactoring and become permanent bloat. They test the implementation shape, not decisions, and break on every future refactor — generating maintenance cost with no regression value.
-**Solution**: Phase 6 (Prune). Every characterization test must be explicitly graduated with a reason or deleted. The default is deletion.
+**Solution**: The separate prune pass. Every characterization test is graduated with a reason or deleted there; the default is deletion.

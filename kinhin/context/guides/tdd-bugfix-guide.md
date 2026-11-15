@@ -19,7 +19,7 @@ Fix bugs by reproducing them in a failing test first. Workflows: `tdd-spec.md` �
 
 **Objective**: Create test that fails due to the bug.
 
-**Lifecycle Tag**: The reproduction test is `@incident(ref=<ticket>)` at birth. It reproduces a real production failure and is permanent by definition — it is the regression guard that ensures this specific bug never returns.
+**Authority**: The reproduction test cites the bug ticket in its docstring. It reproduces a real production failure and is the regression guard that ensures this specific bug never returns; the separate classification pass keeps it as an `incident`.
 
 **Test Requirements:**
 - Test must fail with current buggy code
@@ -51,7 +51,7 @@ def test_discount_calculation_handles_zero_amount() -> None:
 
 **Objective**: Identify related scenarios that might have same bug.
 
-**Lifecycle Tag**: Tests born in this phase are `@scaffold`. They are exploratory — probing whether the bug's root cause affects other paths. Most will be deleted or collapsed into the reproduction test during the Prune phase.
+These tests are exploratory — probing whether the bug's root cause affects other paths. Most will be deleted or collapsed into the reproduction test by the separate prune pass, not by the author.
 
 **Considerations:**
 - Similar input patterns
@@ -69,18 +69,9 @@ def test_discount_calculation_handles_zero_amount() -> None:
 - Fix should handle all related scenarios
 - Fix should include appropriate error handling
 
-### Phase 5: Graduate and Prune
+### After the Fix: Prune Is a Separate Pass
 
-**Objective**: Keep the incident test, graduate any scaffold that encodes a real decision, delete the rest.
-
-**The reproduction test (`@incident`) survives unconditionally** — it is the permanent regression guard.
-
-**Phase 3 scaffold tests are evaluated:**
-- Does the scenario encode a non-obvious decision about error handling? → Graduate to `@decision(ref=)` with a stated reason.
-- Does it cover the same equivalence class as the reproduction test? → Collapse into the reproduction test as an additional parametrized row, or delete.
-- Is it a different bug entirely? → Separate it into its own `@incident(ref=)` with its own ticket.
-
-**PR census line**: `written N / pruned M / survivors: X decision, Y contract, Z incident`.
+The author stops at the fix. Classification and prune run later, by someone other than the author (`kinhin tag` + `/kinhin:prune`, or the milestone's `test-prune` task): the reproduction test survives as the permanent regression guard, and the Phase 3 tests are kept, collapsed into it or deleted there. A Phase 3 test that turns out to be a different bug needs its own ticket: cite it in that test's docstring.
 
 ## Bug Complexity Handling
 
@@ -116,7 +107,7 @@ def test_discount_calculation_handles_zero_amount() -> None:
 3. Generate reproduction tests for all scenarios
 4. Implement fix across all components
 5. Run full integration test suite
-6. Graduate and prune (Phase 5): one `@incident` per real bug, scaffolds collapsed or deleted
+6. Cite each real bug's ticket in its reproduction test; the separate prune pass collapses or deletes the rest
 
 ## Common Pitfalls
 
@@ -134,7 +125,7 @@ def test_discount_calculation_handles_zero_amount() -> None:
 
 ### No Regression Tests
 **Problem**: Bug can reoccur in future.
-**Solution**: The Phase 2 reproduction test (`@incident`) is the permanent regression guard; Phase 5 keeps it and prunes the rest.
+**Solution**: The Phase 2 reproduction test, citing the ticket, is the permanent regression guard.
 
 ### Hasty Fixes
 **Problem**: Quick patch without understanding.
@@ -142,7 +133,7 @@ def test_discount_calculation_handles_zero_amount() -> None:
 
 ### Keeping Every Exploratory Test
 **Problem**: Phase 3 exploratory tests survive as permanent regression tests. They probe related scenarios during investigation but most cover the same root cause as the reproduction test. Keeping them all creates maintenance drag on every future change near the bug.
-**Solution**: Phase 5 (Graduate and Prune). The reproduction test (`@incident`) is the permanent guard. Exploratory tests collapse into it or die.
+**Solution**: The separate prune pass, not the author. The reproduction test is the permanent guard; exploratory tests collapse into it or die there.
 
 ## Bug Categories and Approaches
 
@@ -209,8 +200,8 @@ def calculate_discount(user: User, amount: Decimal) -> Decimal:
         return Decimal("0")  # FIX: Handle zero and negative
     # ... rest of logic
 
-PHASE 5: Graduate and Prune
-- test_discount_with_zero_amount → @incident(ref="Bug #123"), kept
+LATER, SEPARATE PRUNE PASS (not the author)
+- test_discount_with_zero_amount cites Bug #123 → classified incident, kept
 - negative / very-small amount → collapsed as rows of the incident test
   (same root cause: missing amount <= 0 guard)
 - bulk discount with zero amount → kept only if it pins a behavior the

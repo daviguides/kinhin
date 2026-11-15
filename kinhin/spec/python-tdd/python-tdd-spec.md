@@ -55,54 +55,6 @@ with pytest.raises(ValueError, match="must be positive"):
 ### Assertions
 **Requirement**: Use plain `assert` statements, never `unittest` assertion methods.
 
-## Lifecycle Markers
-
-**Requirement**: Every test carries a lifecycle marker at birth. Untagged = `scaffold` by default. Each permanent marker requires its kwarg: `decision(reason=)`, `contract(party=)`, `incident(ref=)`.
-
-**Registration** — `pyproject.toml`:
-```toml
-[tool.pytest.ini_options]
-markers = [
-    "scaffold: construction-time verification, deleted at prune",
-    "decision: encodes a non-obvious decision (reason required)",
-    "contract: pins a boundary another party depends on (party required)",
-    "incident: reproduces a production failure (ref required)",
-]
-addopts = "--strict-markers"
-```
-
-`--strict-markers` fails collection on an unregistered marker — no typos, no silent drift.
-
-**Usage:**
-```python
-@pytest.mark.scaffold
-def test_parser_returns_dict() -> None: ...
-
-@pytest.mark.decision(reason="deny before soft-delete because DENIED is terminal")
-def test_deny_precedes_soft_delete() -> None: ...
-
-@pytest.mark.contract(party="iOS BrandDetails v2")
-def test_brand_details_wire_format() -> None: ...
-
-@pytest.mark.incident(ref="TRYPLAT-186")
-def test_scan_match_never_walks_keyspace() -> None: ...
-```
-
-**Promotion** — at prune, a scaffold that encodes a real decision is re-tagged: `@pytest.mark.scaffold` → `@pytest.mark.decision(reason="discount is non-negative by contract with billing")`.
-
-**Census / delete set:**
-```bash
-pytest --collect-only -q | wc -l                  # total
-pytest -m scaffold --collect-only -q              # the delete set
-pytest -m decision --collect-only -q | wc -l      # likewise contract, incident
-```
-
-**CI profiles:**
-```bash
-pytest -m "not scaffold"   # gate: permanent tests only
-pytest                     # full, including scaffolds, during development
-```
-
 ## Running Tests
 
 Run the project's suite (`make test`, or the command the plan gives) on the whole affected set. Never `-x` / `--exitfirst` / `--maxfail=1`: read every failure in one run and batch-fix. Never `pytest-rerunfailures` or any rerun-until-green. A failure that comes and goes is classified (rerun isolated ×3: `deterministic-fail`, `isolation-dependent` or `flaky`), never rerun to green.

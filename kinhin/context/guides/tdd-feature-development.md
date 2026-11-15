@@ -63,7 +63,7 @@ Scenarios at GREEN: `tdd-spec.md` → Scenario Requirements.
 
 ### Phase 6: Prune
 
-A separate pass after the feature merges (the milestone's `test-prune` task, or `/kinhin:prune`), not a block of the plan: the implementing author tags tests and never prunes them.
+A separate pass after the feature merges (the milestone's `test-prune` task, or `kinhin tag` + `/kinhin:prune`), not a block of the plan: the implementing author never tags, collapses or prunes tests.
 
 ---
 

@@ -1,6 +1,48 @@
 # TDD Prune Specification
 
-The prune pass: what survives construction and what dies. Tags at birth, graduation criteria and attribution live in `tdd-spec.md`; this file is for whoever prunes — a human at the end of a branch (`/kinhin:prune`), or the runner's `test-prune` task, once per milestone. The implementing author tags tests and never prunes.
+The prune pass: what survives construction and what dies. This file is for whoever classifies and prunes — a human running `/kinhin:prune` as a separate step, or the runner's `test-prune` task, once per milestone. The implementing author never tags, prunes or collapses tests; failure attribution lives in `tdd-spec.md`.
+
+## Lifecycle Tags
+
+Tags are assigned by the classification pass (`kinhin tag`, or the pruner), never by the author while writing. A test with no tag is a construction test: `scaffold` until the classification says otherwise. A source the author cited in a docstring is evidence for the classification, not a tag.
+
+**Temporary tags** (die at prune):
+
+| Tag | Authority | Lifetime |
+|-----|-----------|----------|
+| `scaffold` | None — construction verification | Deleted or collapsed at prune |
+| `characterization` | None — golden-master snapshot for a refactoring | Deleted after refactor completes |
+
+**Permanent tags** (survive prune, require a `ref`):
+
+| Tag | Authority | Ref points to |
+|-----|-----------|---------------|
+| `decision(ref=)` | A documented choice | ADR, doc section, ticket, code comment with rationale |
+| `contract(ref=)` | An external consumer | API doc, wire format, schema, iOS client contract |
+| `incident(ref=)` | Production behavior that failed | Incident ticket, postmortem, date of failure |
+
+**Corollary**: A test with no authority has no right to outlive construction.
+
+### Graduation Criteria
+
+A test earns a permanent tag if **any one** holds:
+
+1. It encodes a **decision** not visible from the mechanism — the "why", not the "how".
+2. It guards a failure that would be **silent in production** — wrong value returned, no exception raised, data quietly corrupted.
+3. It pins a **boundary** another party depends on — wire format, public API, serialized payload order.
+4. The scenario was **expensive to discover** — a production incident, hours of debugging, a measured false positive.
+
+### Explicit Rulings
+
+| Test kind | Tag | Rationale |
+|-----------|-----|-----------|
+| Property test (invariant) | `decision` | Invariants are decisions — otherwise they get pruned as "re-derivable" |
+| Integration test crossing system boundary | `contract` | The boundary is the authority |
+| Bugfix reproduction test | `incident` | The incident is the authority |
+| Characterization test for refactoring | `scaffold` | Golden-master dies when the refactor completes |
+| Scenario matrix exploration rows | `scaffold` | Construction verification, not regression |
+
+The marker syntax per language (pytest marker, Rust `mod scaffold` and `// kinhin:` comment, JUnit `@Tag`, TypeScript file suffix) is in `tdd-lifecycle-tags.md`, with the commands that read it.
 
 ## Prune Criteria
 
@@ -13,10 +55,10 @@ A test is pruned if **all** hold:
 
 ## Independent Prune
 
-A tag is the author's claim, written under construction pressure. When the pruner is not the author (the runner's `test-prune` workflow, one prune per milestone), the tag is a hint, not a verdict:
+A tag on an existing test is a claim, often written under construction pressure (legacy suites tag nearly everything permanent). The pruner treats it as a hint, not a verdict:
 
 1. A permanent tag (`decision`, `contract`, `incident`) whose `ref` resolves to a live authority (an ADR or doc section that exists, a schema or consumer that exists, an incident ticket) keeps the test.
-2. A permanent tag with no `ref`, or a `ref` that does not resolve, is re-judged against the Graduation Criteria (`tdd-spec.md`). Meeting none of them, it is scaffold.
+2. A permanent tag with no `ref`, or a `ref` that does not resolve, is re-judged against the Graduation Criteria (above). Meeting none of them, it is scaffold.
 3. An untagged test is judged the same way.
 4. A test cited as evidence in a delivered task's `completeness.md` is never deleted or renamed: the delivery's proof points at it.
 5. What survives is what is pinned to something stable: a boundary contract (schema, external tool format, CLI), a regression of a real bug, an invariant of a pure function, a decision with a live ref.
@@ -41,7 +83,7 @@ N scaffold rows over one function collapse into **one table-driven test** tagged
 **Requirement**: 100% of `@decision`, `@contract`, and `@incident` tests whose `ref` resolves survive the prune, and 100% of tests cited as completeness evidence (see Independent Prune).
 
 ### Tag Completeness
-**Requirement**: 0 untagged tests at merge. Every test is explicitly `@scaffold` (and removed) or carries a permanent tag with a `ref`.
+**Requirement**: 0 untagged tests after the prune pass. The classification tags every test; each one is `scaffold` (and removed or collapsed) or carries a permanent tag with a `ref`.
 
 ### Retention Quality
 - Every surviving test has a permanent tag with ref?
